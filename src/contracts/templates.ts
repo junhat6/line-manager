@@ -1,0 +1,47 @@
+/**
+ * メッセージテンプレートの変数コントラクト。
+ * テンプレート実装(src/lib/templates.ts)はこの型だけに依存し、DBの形を知らない。
+ */
+
+export type AnnounceSessionInput = {
+  sessionId: string;
+  /** 例: "7/18(土) 19:00" */
+  label: string;
+};
+
+export type AnnounceInput = {
+  eventTitle: string;
+  sessions: AnnounceSessionInput[];
+};
+
+export type GroupInviteInput = {
+  /** 例: "7/18(土)" */
+  dateLabel: string;
+  inviteLink: string;
+};
+
+export type SlideRequestInput = {
+  dateLabel: string;
+  slideUrl: string;
+};
+
+export type DayBeforeInput = {
+  dateLabel: string;
+  /** 例: "19:00" */
+  startTime: string;
+  slideUrl: string;
+};
+
+export type DayOfInput = {
+  dateLabel: string;
+  startTime: string;
+  meetingInfo: string;
+  slideUrl: string;
+  /** 未設定なら当日の流れのセクションを省略 */
+  dayFlow: string | null;
+};
+
+export type SurveyInput = {
+  firstTimeUrl: string;
+  repeatUrl: string;
+};
