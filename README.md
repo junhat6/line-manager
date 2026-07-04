@@ -11,7 +11,7 @@
 - 「どこまで対応したか」が見えるチェックリスト
 - 複数LINEチャネル対応(無料枠のグループ分散)とチャネル別の消費量表示
 
-日々の運営手順は [docs/operations.md](docs/operations.md) を参照してください(引き継ぎ資料を兼ねます)。
+日々の運営手順は [docs/manual.md](docs/manual.md) を参照してください(引き継ぎ資料を兼ねます。「運営マニュアルの共有」の手順で運営メンバーに限定公開できます)。
 
 ## 設計の前提: LINE APIの制約
 
@@ -68,7 +68,7 @@ DATABASE_URL="postgresql://..." npm run db:migrate
 1. このリポジトリをGitHubにpushし、Vercelでインポート
 2. 環境変数を設定(`.env.example` 参照):
    `DATABASE_URL` / `LINE_CHANNEL_ACCESS_TOKEN` / `LINE_CHANNEL_SECRET` / `ADMIN_USER` / `ADMIN_PASSWORD` / `CRON_SECRET`
-   (`CRON_SECRET` は `openssl rand -hex 32` などで生成したランダム文字列)
+   (`CRON_SECRET` は `openssl rand -hex 32` などで生成したランダム文字列。任意の `DOCS_TOKEN` は「運営マニュアルの共有」参照)
 3. デプロイ後、LINE DevelopersコンソールのMessaging API設定で
    **Webhook URL** に `https://<デプロイ先>/api/line/webhook` を設定し、「検証」が成功することを確認。**Webhookの利用をオン**にする
 
@@ -89,6 +89,17 @@ DATABASE_URL="postgresql://..." npm run db:migrate
 1. メインのLINEグループ(全体アナウンス用)にボットを招待
 2. 管理画面の **グループ** ページに自動で現れるので、役割を **メイン** に設定
 3. **設定** ページでアンケートURLを確認(要件の定型URLがデフォルトで入っています)
+
+### 6. 運営マニュアルの共有(任意)
+
+運営メンバー向けのWebマニュアル(Basic認証のID/パスワード入り)を、Notionの「リンクを知っている人だけ閲覧可」と同じ方式で限定公開できます。
+
+1. `openssl rand -hex 16` などでトークンを生成し、Vercelの環境変数 `DOCS_TOKEN` に設定して再デプロイ
+2. `https://<デプロイ先>/p/docs/<DOCS_TOKEN>` を運営メンバーに共有(LINEなど)
+
+- 原稿は [docs/manual.md](docs/manual.md)。ID/パスワードは原稿に書かず、環境変数からページ描画時に表示されるため、リポジトリに秘密は残りません
+- `DOCS_TOKEN` 未設定ならページ自体が404になります(機能オフ)
+- **URLを知っている人はID/パスワードまで見られます**。流出したら `DOCS_TOKEN` を新しい値に変えて再デプロイ(必要なら `ADMIN_PASSWORD` も変更)すれば旧URLは無効になります
 
 ## ローカル開発
 
