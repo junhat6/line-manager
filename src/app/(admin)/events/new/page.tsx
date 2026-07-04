@@ -1,5 +1,6 @@
 import { createEvent } from "@/app/actions";
 import { SubmitButton } from "@/components/SubmitButton";
+import { ToastForm } from "@/components/ToastForm";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Field,
@@ -23,7 +24,8 @@ export default function NewEventPage() {
 
       <Card>
         <CardContent>
-          <form action={createEvent}>
+          {/* 成功時はredirectで遷移、検証エラーはトーストで表示 */}
+          <ToastForm action={createEvent}>
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="title">イベント名</FieldLabel>
@@ -79,7 +81,7 @@ export default function NewEventPage() {
               {/* Fieldの中に置くと *:w-full で全幅に伸ばされるためFieldGroup直下に置く */}
               <SubmitButton className="w-fit">作成する</SubmitButton>
             </FieldGroup>
-          </form>
+          </ToastForm>
         </CardContent>
       </Card>
     </div>

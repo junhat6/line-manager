@@ -3,6 +3,7 @@ import { CheckIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 import { saveSettings } from "@/app/actions";
 import { SubmitButton } from "@/components/SubmitButton";
+import { ToastForm } from "@/components/ToastForm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Card,
@@ -110,7 +111,7 @@ export default async function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={saveSettings}>
+          <ToastForm action={saveSettings}>
             <FieldGroup className="gap-4">
               <Field>
                 <FieldLabel htmlFor="surveyUrlFirst">
@@ -143,7 +144,7 @@ export default async function SettingsPage() {
               {/* Fieldの中に置くと *:w-full で全幅に伸ばされるためFieldGroup直下に置く */}
               <SubmitButton className="w-fit">保存する</SubmitButton>
             </FieldGroup>
-          </form>
+          </ToastForm>
         </CardContent>
       </Card>
     </div>

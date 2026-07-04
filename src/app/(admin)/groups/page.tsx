@@ -2,6 +2,7 @@ import { asc } from "drizzle-orm";
 import { UsersIcon } from "lucide-react";
 import { setGroupKind } from "@/app/actions";
 import { SubmitButton } from "@/components/SubmitButton";
+import { ToastForm } from "@/components/ToastForm";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -93,7 +94,7 @@ export default async function GroupsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <form
+                      <ToastForm
                         action={setGroupKind}
                         className="flex items-center gap-2"
                       >
@@ -122,7 +123,7 @@ export default async function GroupsPage() {
                         <SubmitButton variant="outline" size="sm">
                           変更
                         </SubmitButton>
-                      </form>
+                      </ToastForm>
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {/* joinイベントで自動記録。実態(どのボットが居るか)とズレないよう手動変更UIは設けない */}

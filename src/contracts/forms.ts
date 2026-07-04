@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+/**
+ * Server Actionの実行結果。UIはこれをトーストに変換して表示する。
+ * 期待されるエラー(検証・業務エラー)はthrowせず戻り値で返すのがNext.jsの規約
+ * (throwするとエラーページ行きになり、その場でリカバリできないため)。
+ */
+export type ActionResult =
+  | { ok: true; message: string }
+  | { ok: false; message: string };
+
 /** 空文字はnullに、それ以外はhttp(s) URLのみ許可 */
 const optionalUrl = z
   .string()

@@ -19,6 +19,7 @@ import {
 } from "@/app/actions";
 import { ConfirmButton } from "@/components/ConfirmButton";
 import { SubmitButton } from "@/components/SubmitButton";
+import { ToastForm } from "@/components/ToastForm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -146,7 +147,7 @@ export default async function EventDetailPage({
         </div>
         <div className="flex shrink-0 gap-2">
           {event.status !== "done" && (
-            <form action={markEventDone}>
+            <ToastForm action={markEventDone}>
               <input type="hidden" name="eventId" value={event.id} />
               <ConfirmButton
                 confirmMessage="このイベントを完了にしますか?"
@@ -154,7 +155,7 @@ export default async function EventDetailPage({
               >
                 完了にする
               </ConfirmButton>
-            </form>
+            </ToastForm>
           )}
           <form action={deleteEvent}>
             <input type="hidden" name="eventId" value={event.id} />
@@ -306,7 +307,7 @@ function ActionCell({
     : `「${item.label}」をLINEに送信します。よろしいですか?`;
 
   return (
-    <form action={sendMessageAction}>
+    <ToastForm action={sendMessageAction}>
       <input type="hidden" name="id" value={item.id} />
       <input type="hidden" name="eventId" value={eventId} />
       {isResendOfSent && <input type="hidden" name="force" value="1" />}
@@ -318,7 +319,7 @@ function ActionCell({
       >
         {label}
       </ConfirmButton>
-    </form>
+    </ToastForm>
   );
 }
 
@@ -383,7 +384,7 @@ function SessionCard({
                     <Badge variant="secondary">手動</Badge>
                   )}
                 </span>
-                <form action={removeAttendance} className="shrink-0">
+                <ToastForm action={removeAttendance} className="shrink-0">
                   <input
                     type="hidden"
                     name="attendanceId"
@@ -400,7 +401,7 @@ function SessionCard({
                   >
                     <XIcon />
                   </ConfirmButton>
-                </form>
+                </ToastForm>
               </li>
             ))}
           </ul>
@@ -410,7 +411,7 @@ function SessionCard({
             取消: {cancelled.map((r) => r.member.displayName).join("、")}
           </p>
         )}
-        <form action={addManualAttendee} className="flex gap-2 pt-1">
+        <ToastForm action={addManualAttendee} className="flex gap-2 pt-1">
           <input type="hidden" name="sessionId" value={session.id} />
           <input type="hidden" name="eventId" value={eventId} />
           <Input
@@ -423,11 +424,11 @@ function SessionCard({
             className="flex-1"
           />
           <SubmitButton variant="outline">追加</SubmitButton>
-        </form>
+        </ToastForm>
       </CardContent>
 
       <CardContent className="border-t pt-(--card-spacing)">
-        <form action={updateSession}>
+        <ToastForm action={updateSession}>
           <input type="hidden" name="sessionId" value={session.id} />
           <input type="hidden" name="eventId" value={eventId} />
 
@@ -568,7 +569,7 @@ function SessionCard({
             {/* Fieldの中に置くと *:w-full で全幅に伸ばされるためFieldGroup直下に置く */}
             <SubmitButton className="w-fit">保存する</SubmitButton>
           </FieldGroup>
-        </form>
+        </ToastForm>
       </CardContent>
     </Card>
   );

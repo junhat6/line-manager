@@ -12,6 +12,7 @@ import {
   startSchedulePoll,
 } from "@/app/actions";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { ToastForm } from "@/components/ToastForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,7 +47,7 @@ export default async function PollsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">日程調整</h1>
-        <form action={startSchedulePoll}>
+        <ToastForm action={startSchedulePoll}>
           <ConfirmButton
             confirmMessage="調整さんに来月全日程の日程調整を作成し、URLをメイングループにLINE送信します。よろしいですか?(グループ人数分のメッセージ数を消費します)"
             actionLabel="開始する"
@@ -56,7 +57,7 @@ export default async function PollsPage() {
             <PlusIcon data-icon="inline-start" />
             来月の日程調整を開始
           </ConfirmButton>
-        </form>
+        </ToastForm>
       </div>
       <p className="max-w-prose text-sm text-pretty text-muted-foreground">
         「開始」で調整さん(chouseisan.com)に来月の全日程を候補にした出欠表を作り、URLをメイングループへ自動投稿します。
@@ -102,7 +103,7 @@ export default async function PollsPage() {
                         </Button>
                       ) : (
                         // 取込で作ったイベントが削除された場合は再取込を許す
-                        <form
+                        <ToastForm
                           action={importSchedulePoll}
                           className="flex items-center gap-2"
                         >
@@ -116,10 +117,10 @@ export default async function PollsPage() {
                           >
                             結果を取り込み直す
                           </ConfirmButton>
-                        </form>
+                        </ToastForm>
                       )
                     ) : (
-                      <form action={importSchedulePoll}>
+                      <ToastForm action={importSchedulePoll}>
                         <input type="hidden" name="id" value={poll.id} />
                         <ConfirmButton
                           confirmMessage="調整さんの回答を集計し、上位2日程でイベントを自動作成します。よろしいですか?"
@@ -128,7 +129,7 @@ export default async function PollsPage() {
                         >
                           結果を取り込んでイベント作成
                         </ConfirmButton>
-                      </form>
+                      </ToastForm>
                     )}
                   </CardAction>
                 </CardHeader>
@@ -147,7 +148,7 @@ export default async function PollsPage() {
                       グループ投稿済み {formatJstDateTimeLabel(poll.postedAt)}
                     </span>
                   ) : (
-                    <form
+                    <ToastForm
                       action={postSchedulePollUrl}
                       className="flex items-center gap-2"
                     >
@@ -161,7 +162,7 @@ export default async function PollsPage() {
                         <SendIcon data-icon="inline-start" />
                         グループに投稿する
                       </ConfirmButton>
-                    </form>
+                    </ToastForm>
                   )}
                 </CardContent>
               </Card>
