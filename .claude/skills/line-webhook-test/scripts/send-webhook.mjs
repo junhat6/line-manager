@@ -19,7 +19,8 @@ const { values: args } = parseArgs({
     "session-id": { type: "string" },
     "group-id": { type: "string", default: "C0000000000000000000000000000000" },
     "user-id": { type: "string", default: "U0000000000000000000000000000000" },
-    url: { type: "string", default: "http://localhost:3000/api/line/webhook" },
+    url: { type: "string" },
+    channel: { type: "string", default: "1" },
     "dry-run": { type: "boolean", default: false },
   },
 });
@@ -32,6 +33,14 @@ function fail(msg) {
 if (!["join", "leave", "postback"].includes(args.type ?? "")) {
   fail("--type は join | leave | postback のいずれかを指定してください");
 }
+const channel = Number.parseInt(args.channel, 10);
+if (!Number.isInteger(channel) || channel < 1) {
+  fail("--channel は 1 以上の整数を指定してください");
+}
+// --url 未指定なら、チャネル2以降は本番と同じく ?channel=N を付けて送る
+const url =
+  args.url ??
+  `http://localhost:3000/api/line/webhook${channel >= 2 ? `?channel=${channel}` : ""}`;
 if (args.type === "postback") {
   if (!args["session-id"]) fail("--type postback には --session-id <UUID> が必要です");
   if (!["attend", "cancel"].includes(args.action)) {
@@ -39,14 +48,18 @@ if (args.type === "postback") {
   }
 }
 
+// チャネル1は基本名、2以降は連番付きの環境変数(src/lib/line/channels.ts と同じ規約)
+const secretKey =
+  channel === 1 ? "LINE_CHANNEL_SECRET" : `LINE_CHANNEL_${channel}_SECRET`;
+
 // サーバー(Next.js は .env / .env.local を自動読込)と同じ値を使うため、
 // 環境変数 → .env.local → .env の順で探す
 function loadChannelSecret() {
-  if (process.env.LINE_CHANNEL_SECRET) return process.env.LINE_CHANNEL_SECRET;
+  if (process.env[secretKey]) return process.env[secretKey];
   for (const name of [".env.local", ".env"]) {
     try {
       const text = readFileSync(resolve(projectRoot, name), "utf8");
-      const m = text.match(/^LINE_CHANNEL_SECRET=(.+)$/m);
+      const m = text.match(new RegExp(`^${secretKey}=(.+)$`, "m"));
       if (m) {
         const v = m[1].trim().replace(/^["']|["']$/g, "");
         if (v) return v;
@@ -60,7 +73,7 @@ function loadChannelSecret() {
 
 const secret = loadChannelSecret();
 if (!secret) {
-  fail("LINE_CHANNEL_SECRET が見つかりません(.env.local / .env / 環境変数)");
+  fail(`${secretKey} が見つかりません(.env.local / .env / 環境変数)`);
 }
 
 const base = {
@@ -96,14 +109,14 @@ const signature = crypto.createHmac("sha256", secret).update(body).digest("base6
 
 if (args["dry-run"]) {
   console.log("=== dry-run(送信しません) ===");
-  console.log(`URL: ${args.url}`);
+  console.log(`URL: ${url}`);
   console.log(`x-line-signature: ${signature}`);
   console.log("body:");
   console.log(JSON.stringify(JSON.parse(body), null, 2));
   process.exit(0);
 }
 
-const res = await fetch(args.url, {
+const res = await fetch(url, {
   method: "POST",
   headers: { "content-type": "application/json", "x-line-signature": signature },
   body,
@@ -112,7 +125,7 @@ const res = await fetch(args.url, {
 const text = await res.text();
 console.log(`HTTP ${res.status}: ${text}`);
 if (res.status === 401) {
-  console.error("→ 署名不一致。サーバーとこのスクリプトで LINE_CHANNEL_SECRET が食い違っています");
+  console.error(`→ 署名不一致。サーバーとこのスクリプトで ${secretKey} が食い違っています`);
   process.exit(1);
 }
 if (!res.ok) process.exit(1);

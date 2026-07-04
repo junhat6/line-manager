@@ -41,7 +41,9 @@ node .claude/skills/line-webhook-test/scripts/send-webhook.mjs \
 node .claude/skills/line-webhook-test/scripts/send-webhook.mjs --type join --dry-run
 ```
 
-オプション: `--group-id` / `--user-id`(既定はダミー ID)、`--url`(既定は localhost:3000)
+オプション: `--group-id` / `--user-id`(既定はダミー ID)、`--url`(既定は localhost:3000)、
+`--channel N`(既定は 1。シークレットを `LINE_CHANNEL_N_SECRET` から読み、
+`--url` 未指定なら本番と同じく `?channel=N` を付けて送る。マルチチャネル構成のテスト用)
 
 ## 期待される挙動と注意
 

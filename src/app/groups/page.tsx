@@ -39,6 +39,7 @@ export default async function GroupsPage() {
               <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                 <th className="px-4 py-2 font-medium">グループ名</th>
                 <th className="px-4 py-2 font-medium">役割</th>
+                <th className="px-4 py-2 font-medium">チャネル</th>
                 <th className="px-4 py-2 font-medium">状態</th>
                 <th className="px-4 py-2 font-medium">参加日時</th>
               </tr>
@@ -72,6 +73,10 @@ export default async function GroupsPage() {
                         変更
                       </button>
                     </form>
+                  </td>
+                  <td className="px-4 py-2 text-slate-600">
+                    {/* joinイベントで自動記録。実態(どのボットが居るか)とズレないよう手動変更UIは設けない */}
+                    {group.channel}
                   </td>
                   <td className="px-4 py-2">
                     {group.active ? (

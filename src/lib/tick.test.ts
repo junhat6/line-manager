@@ -30,7 +30,7 @@ async function createTestDb(): Promise<Db> {
   return drizzle(client, { schema }) as unknown as Db;
 }
 
-type Sent = { to: string; messages: messagingApi.Message[] };
+type Sent = { to: string; messages: messagingApi.Message[]; channel: number };
 
 async function seedSession(
   db: Db,
@@ -62,8 +62,12 @@ async function seedSession(
 describe("runTick", () => {
   let db: Db;
   let sent: Sent[];
-  const send = async (to: string, messages: messagingApi.Message[]) => {
-    sent.push({ to, messages });
+  const send = async (
+    to: string,
+    messages: messagingApi.Message[],
+    channel: number,
+  ) => {
+    sent.push({ to, messages, channel });
   };
 
   beforeEach(async () => {
@@ -212,6 +216,75 @@ describe("runTick", () => {
       .from(scheduledMessages)
       .where(eq(scheduledMessages.id, row.id));
     expect(after.status).toBe("failed");
+  });
+
+  it("日程別グループを担当するチャネルで送信される(チャネル2のグループ)", async () => {
+    const { event, session } = await seedSession(db);
+    await db
+      .update(lineGroups)
+      .set({ channel: 2 })
+      .where(eq(lineGroups.lineGroupId, "G-session"));
+    await db.insert(scheduledMessages).values({
+      eventId: event.id,
+      sessionId: session.id,
+      kind: "day_before",
+      scheduledAt: new Date("2026-07-17T15:00:00+09:00"),
+    });
+
+    const result = await runTick(db, {
+      now: new Date("2026-07-17T15:02:00+09:00"),
+      send,
+    });
+    expect(result.results[0].ok).toBe(true);
+    expect(sent[0].to).toBe("G-session");
+    expect(sent[0].channel).toBe(2);
+  });
+
+  it("メイングループ宛(announce)はメイングループのチャネルで送信される", async () => {
+    const { event } = await seedSession(db);
+    await db.insert(lineGroups).values({
+      lineGroupId: "G-main",
+      name: "メイン",
+      kind: "main",
+    });
+    const [row] = await db
+      .insert(scheduledMessages)
+      .values({ eventId: event.id, sessionId: null, kind: "announce" })
+      .returning();
+
+    const result = await sendScheduledMessage(db, row.id, { send });
+    expect(result?.ok).toBe(true);
+    expect(sent[0].to).toBe("G-main");
+    expect(sent[0].channel).toBe(1);
+  });
+
+  it("紐付いたグループがグループ一覧に無い日程はfailedになり理由が記録される", async () => {
+    const { event, session } = await seedSession(db, {
+      lineGroupId: "G-ghost",
+    });
+    const [row] = await db
+      .insert(scheduledMessages)
+      .values({
+        eventId: event.id,
+        sessionId: session.id,
+        kind: "day_before",
+        scheduledAt: new Date("2026-07-17T15:00:00+09:00"),
+      })
+      .returning();
+
+    const result = await runTick(db, {
+      now: new Date("2026-07-17T15:02:00+09:00"),
+      send,
+    });
+    expect(result.results[0].ok).toBe(false);
+    expect(sent).toHaveLength(0);
+
+    const [after] = await db
+      .select()
+      .from(scheduledMessages)
+      .where(eq(scheduledMessages.id, row.id));
+    expect(after.status).toBe("failed");
+    expect(after.error).toContain("グループ一覧に見つかりません");
   });
 
   it("announce送信でイベントがannouncedになる", async () => {

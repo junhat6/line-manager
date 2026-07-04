@@ -29,6 +29,7 @@ import {
 export type SendFn = (
   to: string,
   messages: messagingApi.Message[],
+  channel: number,
 ) => Promise<void>;
 
 export type SendResult = {
@@ -38,7 +39,11 @@ export type SendResult = {
   error?: string;
 };
 
-export type BuiltMessage = { to: string; messages: messagingApi.Message[] };
+export type BuiltMessage = {
+  to: string;
+  channel: number;
+  messages: messagingApi.Message[];
+};
 
 /**
  * scheduled_messages の1行を送信する。
@@ -71,7 +76,7 @@ export async function sendScheduledMessage(
 
   try {
     const built = await buildScheduledMessage(db, row);
-    await (opts.send ?? pushMessages)(built.to, built.messages);
+    await (opts.send ?? pushMessages)(built.to, built.messages, built.channel);
     await db
       .update(scheduledMessages)
       .set({ status: "sent", sentAt: new Date(), error: null })
@@ -106,7 +111,7 @@ export async function buildScheduledMessage(
 ): Promise<BuiltMessage> {
   switch (row.kind) {
     case "announce": {
-      const to = await requireMainGroupId(db);
+      const target = await requireMainGroup(db);
       const eventRows = await db
         .select()
         .from(events)
@@ -122,7 +127,7 @@ export async function buildScheduledMessage(
         throw new Error("日程が登録されていません");
       }
       return {
-        to,
+        ...target,
         messages: buildAnnounceMessages({
           eventTitle: event.title,
           sessions: sessionRows.map((s) => ({
@@ -134,14 +139,14 @@ export async function buildScheduledMessage(
     }
     case "group_invite": {
       const session = await requireSession(db, row);
-      const to = await requireMainGroupId(db);
+      const target = await requireMainGroup(db);
       if (!session.inviteLink) {
         throw new Error(
           "グループの招待リンクが未設定です(日程の編集フォームで入力してください)",
         );
       }
       return {
-        to,
+        ...target,
         messages: buildGroupInviteMessages({
           dateLabel: formatJstDateLabel(session.startAt),
           inviteLink: session.inviteLink,
@@ -151,7 +156,7 @@ export async function buildScheduledMessage(
     case "slide_request": {
       const session = await requireSession(db, row);
       return {
-        to: requireSessionGroup(session),
+        ...(await requireSessionGroup(db, session)),
         messages: buildSlideRequestMessages({
           dateLabel: formatJstDateLabel(session.startAt),
           slideUrl: requireSlideUrl(session),
@@ -161,7 +166,7 @@ export async function buildScheduledMessage(
     case "day_before": {
       const session = await requireSession(db, row);
       return {
-        to: requireSessionGroup(session),
+        ...(await requireSessionGroup(db, session)),
         messages: buildDayBeforeMessages({
           dateLabel: formatJstDateLabel(session.startAt),
           startTime: formatJstTime(session.startAt),
@@ -177,7 +182,7 @@ export async function buildScheduledMessage(
         );
       }
       return {
-        to: requireSessionGroup(session),
+        ...(await requireSessionGroup(db, session)),
         messages: buildDayOfMessages({
           dateLabel: formatJstDateLabel(session.startAt),
           startTime: formatJstTime(session.startAt),
@@ -190,7 +195,7 @@ export async function buildScheduledMessage(
     case "survey": {
       const session = await requireSession(db, row);
       return {
-        to: requireSessionGroup(session),
+        ...(await requireSessionGroup(db, session)),
         messages: buildSurveyMessages({
           firstTimeUrl: await getSetting(db, SETTING_KEYS.surveyUrlFirst),
           repeatUrl: await getSetting(db, SETTING_KEYS.surveyUrlRepeat),
@@ -200,9 +205,16 @@ export async function buildScheduledMessage(
   }
 }
 
-async function requireMainGroupId(db: Db): Promise<string> {
+/** 宛先グループとそのグループを担当するLINEチャネル */
+export type GroupTarget = { to: string; channel: number };
+
+/** メイングループの宛先とチャネル。日程調整URLの投稿(actions)でも使う */
+export async function requireMainGroup(db: Db): Promise<GroupTarget> {
   const rows = await db
-    .select({ lineGroupId: lineGroups.lineGroupId })
+    .select({
+      lineGroupId: lineGroups.lineGroupId,
+      channel: lineGroups.channel,
+    })
     .from(lineGroups)
     .where(and(eq(lineGroups.kind, "main"), eq(lineGroups.active, true)));
   const main = rows[0];
@@ -211,7 +223,7 @@ async function requireMainGroupId(db: Db): Promise<string> {
       "メイングループが未設定です(グループ画面で「メイン」に設定してください)",
     );
   }
-  return main.lineGroupId;
+  return { to: main.lineGroupId, channel: main.channel };
 }
 
 async function requireSession(db: Db, row: ScheduledMessage): Promise<Session> {
@@ -225,13 +237,36 @@ async function requireSession(db: Db, row: ScheduledMessage): Promise<Session> {
   return session;
 }
 
-function requireSessionGroup(session: Session): string {
+/**
+ * 日程別グループの宛先とチャネルを解決する。
+ * チャネルは sessions にコピーせず lineGroups を毎回引く —
+ * ボット入れ替え(旧退出→新招待)時に、紐付けを触らなくても自動で追従させるため。
+ */
+async function requireSessionGroup(
+  db: Db,
+  session: Session,
+): Promise<GroupTarget> {
   if (!session.lineGroupId) {
     throw new Error(
       "日程別LINEグループが未紐付けです(グループにボットを招待して、イベント詳細で紐付けてください)",
     );
   }
-  return session.lineGroupId;
+  const rows = await db
+    .select()
+    .from(lineGroups)
+    .where(eq(lineGroups.lineGroupId, session.lineGroupId));
+  const group = rows[0];
+  if (!group) {
+    throw new Error(
+      "日程別LINEグループがグループ一覧に見つかりません(ボットを招待し直してください)",
+    );
+  }
+  if (!group.active) {
+    throw new Error(
+      "ボットが日程別LINEグループから退出しています(招待し直してください)",
+    );
+  }
+  return { to: group.lineGroupId, channel: group.channel };
 }
 
 function requireSlideUrl(session: Session): string {

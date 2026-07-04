@@ -23,6 +23,9 @@ export default function RootLayout({
             <Link href="/" className="text-sm hover:underline">
               イベント
             </Link>
+            <Link href="/polls" className="text-sm hover:underline">
+              日程調整
+            </Link>
             <Link href="/groups" className="text-sm hover:underline">
               グループ
             </Link>

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { saveSettings } from "@/app/actions";
 import { getDb } from "@/db/client";
 import { lineGroups } from "@/db/schema";
+import { getChannelQuotas } from "@/lib/line/quota";
 import { getSetting, SETTING_KEYS } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export default async function SettingsPage() {
     .from(lineGroups)
     .where(and(eq(lineGroups.kind, "main"), eq(lineGroups.active, true)));
   const mainGroup = mainRows[0];
+  const quotas = await getChannelQuotas();
 
   return (
     <div className="max-w-lg space-y-8">
@@ -36,6 +38,34 @@ export default async function SettingsPage() {
             で全体アナウンス用のグループを「メイン」に設定してください。
           </p>
         )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="font-bold">LINEチャネルと無料枠</h2>
+        <p className="text-xs text-slate-500">
+          グループ宛のpushはグループ人数分カウントされます。当月の実測値です。
+        </p>
+        <ul className="space-y-2">
+          {quotas.map((q) => (
+            <li
+              key={q.channel}
+              className="rounded-lg border border-slate-200 bg-white p-4 text-sm"
+            >
+              {q.ok ? (
+                <span>
+                  チャネル{q.channel}: 当月消費{" "}
+                  <span className="font-bold">{q.totalUsage}</span>
+                  {q.limit !== null ? ` / ${q.limit}通` : "通(上限なしプラン)"}
+                </span>
+              ) : (
+                <span className="text-amber-800">
+                  チャネル{q.channel}: 消費量を取得できませんでした(
+                  {q.error})
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="space-y-3">

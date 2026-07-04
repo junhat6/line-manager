@@ -1,12 +1,16 @@
 import { messagingApi } from "@line/bot-sdk";
-import { getEnv } from "@/lib/env";
+import { getLineChannel } from "./channels";
 
-let client: messagingApi.MessagingApiClient | undefined;
+const clients = new Map<number, messagingApi.MessagingApiClient>();
 
-export function getLineClient(): messagingApi.MessagingApiClient {
-  client ??= new messagingApi.MessagingApiClient({
-    channelAccessToken: getEnv().LINE_CHANNEL_ACCESS_TOKEN,
-  });
+export function getLineClient(channel = 1): messagingApi.MessagingApiClient {
+  let client = clients.get(channel);
+  if (!client) {
+    client = new messagingApi.MessagingApiClient({
+      channelAccessToken: getLineChannel(channel).accessToken,
+    });
+    clients.set(channel, client);
+  }
   return client;
 }
 
@@ -14,6 +18,7 @@ export function getLineClient(): messagingApi.MessagingApiClient {
 export async function pushMessages(
   to: string,
   messages: messagingApi.Message[],
+  channel = 1,
 ): Promise<void> {
-  await getLineClient().pushMessage({ to, messages });
+  await getLineClient(channel).pushMessage({ to, messages });
 }

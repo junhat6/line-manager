@@ -1,5 +1,6 @@
 import {
   boolean,
+  integer,
   pgEnum,
   pgTable,
   text,
@@ -116,6 +117,12 @@ export const lineGroups = pgTable("line_groups", {
   name: text("name"),
   kind: groupKindEnum("kind").notNull().default("unknown"),
   active: boolean("active").notNull().default(true),
+  /**
+   * このグループに参加しているボットのLINEチャネル番号(環境変数の連番に対応)。
+   * joinイベントで自動記録される。グループ↔チャネルの唯一の真実源で、
+   * 送信時はここを参照して使うボットを決める。
+   */
+  channel: integer("channel").notNull().default(1),
   joinedAt: timestamp("joined_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -146,6 +153,32 @@ export const scheduledMessages = pgTable("scheduled_messages", {
     .defaultNow(),
 });
 
+export const pollStatusEnum = pgEnum("poll_status", ["open", "imported"]);
+
+/**
+ * 調整さん(chouseisan.com)の日程調整。
+ * 管理画面の「日程調整を開始」で調整さんイベントを作成してURLを記録し、
+ * 「結果を取り込む」でCSVを集計して上位2日程のイベント(events)に変換する。
+ */
+export const schedulePolls = pgTable("schedule_polls", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),
+  /** 調整さんのイベントページURL(グループに共有するもの) */
+  chouseisanUrl: text("chouseisan_url").notNull(),
+  /** 候補日の対象月(その月の1日 JST)。候補ラベル「7/18(土)」→日付の復元に使う */
+  targetMonth: timestamp("target_month", { withTimezone: true }).notNull(),
+  status: pollStatusEnum("status").notNull().default("open"),
+  /** URLをメイングループに投稿した時刻(nullなら未投稿=投稿失敗の可能性) */
+  postedAt: timestamp("posted_at", { withTimezone: true }),
+  /** 取込で作成されたイベント。イベント削除時はnullに戻る(調整の履歴は残す) */
+  importedEventId: uuid("imported_event_id").references(() => events.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 /** key-value設定(メイングループID、アンケートURLなど) */
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
@@ -158,3 +191,4 @@ export type Member = typeof members.$inferSelect;
 export type Attendance = typeof attendances.$inferSelect;
 export type LineGroup = typeof lineGroups.$inferSelect;
 export type ScheduledMessage = typeof scheduledMessages.$inferSelect;
+export type SchedulePoll = typeof schedulePolls.$inferSelect;
