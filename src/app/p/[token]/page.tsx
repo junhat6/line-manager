@@ -2,6 +2,13 @@ import { asc, eq, inArray } from "drizzle-orm";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { getDb } from "@/db/client";
 import { attendances, events, members, sessions } from "@/db/schema";
 import { formatJstDateTimeLabel } from "@/lib/jst";
@@ -60,45 +67,44 @@ export default async function PublicStatusPage({
       : [];
 
   return (
-    <main className="mx-auto max-w-md px-5 py-8">
-      <h1 className="text-lg font-bold">🎉 {event.title} の参加状況</h1>
-      <p className="mt-2 text-sm text-slate-600">
-        アナウンスのボタンを押すと、ここに名前が載ります。
-        押した直後に名前が見当たらないときは、少し待ってから開き直してください。
-      </p>
+    <main className="mx-auto flex max-w-md flex-col gap-6 px-5 py-8">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-lg font-semibold text-balance">
+          🎉 {event.title} の参加状況
+        </h1>
+        <p className="text-sm text-pretty text-muted-foreground">
+          アナウンスのボタンを押すと、ここに名前が載ります。
+          押した直後に名前が見当たらないときは、少し待ってから開き直してください。
+        </p>
+      </div>
 
-      <div className="mt-6 space-y-5">
-        {sessionRows.map((session) => {
-          const rows = attendanceRows.filter(
-            (r) => r.attendance.sessionId === session.id,
-          );
-          const attending = rows.filter(
-            (r) => r.attendance.status === "attending",
-          );
-          const cancelled = rows.filter(
-            (r) => r.attendance.status === "cancelled",
-          );
-          return (
-            <section
-              key={session.id}
-              className="rounded-lg border border-slate-200 bg-white p-5"
-            >
-              <h2 className="font-bold">
-                {formatJstDateTimeLabel(session.startAt)}
-              </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                参加 {attending.length}人
-              </p>
+      {sessionRows.map((session) => {
+        const rows = attendanceRows.filter(
+          (r) => r.attendance.sessionId === session.id,
+        );
+        const attending = rows.filter(
+          (r) => r.attendance.status === "attending",
+        );
+        const cancelled = rows.filter(
+          (r) => r.attendance.status === "cancelled",
+        );
+        return (
+          <Card key={session.id}>
+            <CardHeader>
+              <CardTitle>{formatJstDateTimeLabel(session.startAt)}</CardTitle>
+              <CardDescription>参加 {attending.length}人</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2">
               {attending.length === 0 ? (
-                <p className="mt-2 text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   まだ参加表明がありません
                 </p>
               ) : (
-                <ul className="mt-2 space-y-1">
+                <ul className="flex flex-col gap-1">
                   {attending.map(({ attendance, member }) => (
                     <li
                       key={attendance.id}
-                      className="rounded bg-slate-50 px-3 py-1.5 text-sm"
+                      className="rounded-md bg-muted/50 px-3 py-1.5 text-sm"
                     >
                       {member.displayName}
                     </li>
@@ -106,14 +112,14 @@ export default async function PublicStatusPage({
                 </ul>
               )}
               {cancelled.length > 0 && (
-                <p className="mt-2 text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   取消: {cancelled.map((r) => r.member.displayName).join("、")}
                 </p>
               )}
-            </section>
-          );
-        })}
-      </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </main>
   );
 }

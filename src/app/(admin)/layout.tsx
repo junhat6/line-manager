@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminNav } from "@/components/AdminNav";
 
 /**
  * 管理画面共通のナビ。route group (admin) に閉じ込める —
@@ -12,26 +13,26 @@ export default function AdminLayout({
 }>) {
   return (
     <>
-      <header className="border-b border-slate-200 bg-white">
-        <nav className="mx-auto flex max-w-5xl items-center gap-6 px-6 py-3">
-          <Link href="/" className="font-bold">
-            🎉 交流会運営支援
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-1.5 focus:text-sm focus:ring-3 focus:ring-ring/50"
+      >
+        本文へスキップ
+      </a>
+      <header className="border-b bg-background">
+        <div className="mx-auto flex max-w-5xl items-center gap-6 px-6 py-3">
+          <Link
+            href="/"
+            className="rounded-md text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            交流会運営支援
           </Link>
-          <Link href="/" className="text-sm hover:underline">
-            イベント
-          </Link>
-          <Link href="/polls" className="text-sm hover:underline">
-            日程調整
-          </Link>
-          <Link href="/groups" className="text-sm hover:underline">
-            グループ
-          </Link>
-          <Link href="/settings" className="text-sm hover:underline">
-            設定
-          </Link>
-        </nav>
+          <AdminNav />
+        </div>
       </header>
-      <main className="mx-auto max-w-5xl px-6 py-8">{children}</main>
+      <main id="main" className="mx-auto max-w-5xl px-6 py-8">
+        {children}
+      </main>
     </>
   );
 }
