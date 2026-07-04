@@ -10,6 +10,7 @@ import {
   type ScheduledMessage,
   type Session,
 } from "@/db/schema";
+import { getAppBaseUrl } from "@/lib/env";
 import {
   formatJstDateLabel,
   formatJstDateTimeLabel,
@@ -134,6 +135,7 @@ export async function buildScheduledMessage(
             sessionId: s.id,
             label: formatJstDateTimeLabel(s.startAt),
           })),
+          statusUrl: `${getAppBaseUrl()}/p/${event.publicToken}`,
         }),
       };
     }

@@ -77,7 +77,17 @@ export default async function EventDetailPage({
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">{event.title}</h1>
+        <div>
+          <h1 className="text-xl font-bold">{event.title}</h1>
+          <a
+            href={`/p/${event.publicToken}`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-slate-500 underline hover:text-slate-700"
+          >
+            参加状況ページ(アナウンスの「参加状況を確認」で開くもの)↗
+          </a>
+        </div>
         <div className="flex gap-2">
           {event.status !== "done" && (
             <form action={markEventDone}>

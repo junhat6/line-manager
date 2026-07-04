@@ -16,7 +16,7 @@ type FlexComponent = messagingApi.FlexComponent;
  * 開催アナウンス。日程ごとに「参加する」ボタンを置く。
  * postback に displayText を付けない — タップしてもトークに何も流れず、
  * LINE標準の投票と同じ静かな挙動になる(通知が増える方が害という運用判断)。
- * 誰が参加表明したかは管理画面の参加者リストで確認する。
+ * 押した本人へのフィードバックは「参加状況を確認」ボタン(公開ページ)が担う。
  */
 export function buildAnnounceMessages(input: AnnounceInput): Message[] {
   const sessionBlocks: FlexComponent[] = input.sessions.flatMap(
@@ -64,11 +64,22 @@ export function buildAnnounceMessages(input: AnnounceInput): Message[] {
             },
             {
               type: "text",
-              text: "以下の日程で開催します!\n参加する日程のボタンを押してください(両方参加もOK)\n※タップ内容はトークに流れず、そのまま記録されます",
+              text: "以下の日程で開催します!\n参加する日程のボタンを押してください(両方参加もOK)\n※タップしてもトークには流れません。登録できたかは下の「参加状況を確認」から見られます",
               size: "sm",
               wrap: true,
             },
             ...sessionBlocks,
+            { type: "separator" },
+            {
+              type: "button",
+              style: "secondary",
+              height: "sm",
+              action: {
+                type: "uri",
+                label: "参加状況を確認",
+                uri: input.statusUrl,
+              },
+            },
           ],
         },
       },

@@ -53,6 +53,12 @@ export const events = pgTable("events", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
   status: eventStatusEnum("status").notNull().default("draft"),
+  /**
+   * 参加状況の公開ページ(/p/[token])用トークン。
+   * id とは別に持つ — id は管理画面URLに露出しており、公開を止めたくなったら
+   * このトークンだけ無効化(再生成)できる余地を残すため。
+   */
+  publicToken: uuid("public_token").notNull().defaultRandom().unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

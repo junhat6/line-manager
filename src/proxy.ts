@@ -9,6 +9,17 @@ export const config = {
 };
 
 export function proxy(req: Request): Response | undefined {
+  // 参加者向けの参加状況ページ(/p/[token])はGET閲覧のみ認証免除 —
+  // 推測不能なトークンURL自体が認可を兼ねる(LINEのボタンから誰でも開けるようにする)。
+  // matcherで丸ごと除外しない: Server ActionのPOSTはactionIdでグローバルに
+  // ディスパッチされるため、除外パスへの未認証POSTが管理系アクションの実行口になる。
+  if (
+    (req.method === "GET" || req.method === "HEAD") &&
+    new URL(req.url).pathname.startsWith("/p/")
+  ) {
+    return undefined;
+  }
+
   const user = process.env.ADMIN_USER;
   const password = process.env.ADMIN_PASSWORD;
 

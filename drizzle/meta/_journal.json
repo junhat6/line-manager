@@ -15,6 +15,13 @@
       "when": 1783148550791,
       "tag": "0001_strong_clint_barton",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783156136437,
+      "tag": "0002_wonderful_midnight",
+      "breakpoints": true
     }
   ]
 }

@@ -19,13 +19,14 @@ function textOf(messages: messagingApi.Message[]): string {
 }
 
 describe("announce", () => {
-  it("日程ごとに参加ボタンと取消ボタンを持つFlexを組み立てる", () => {
+  it("日程ごとに参加ボタンと取消ボタン、末尾に参加状況確認ボタンを持つFlexを組み立てる", () => {
     const [message] = buildAnnounceMessages({
       eventTitle: "7月交流会",
       sessions: [
         { sessionId: SESSION_ID, label: "7/18(土) 19:00" },
         { sessionId: SESSION_ID, label: "7/25(土) 19:00" },
       ],
+      statusUrl: "https://example.com/p/token-xxxx",
     });
     expect(message.type).toBe("flex");
     const flex = message as messagingApi.FlexMessage;
@@ -35,16 +36,18 @@ describe("announce", () => {
     const buttons = (bubble.body?.contents ?? []).filter(
       (c): c is messagingApi.FlexButton => c.type === "button",
     );
-    // 2日程 × (参加 + 取消)
-    expect(buttons).toHaveLength(4);
+    // 2日程 × (参加 + 取消) + 参加状況確認
+    expect(buttons).toHaveLength(5);
 
-    const actions = buttons.map(
-      (b) => b.action as messagingApi.PostbackAction,
-    );
-    const attend = actions.filter(
+    const postbackActions = buttons
+      .map((b) => b.action)
+      .filter(
+        (a): a is messagingApi.PostbackAction => a?.type === "postback",
+      );
+    const attend = postbackActions.filter(
       (a) => parsePostbackData(a.data ?? "")?.action === "attend",
     );
-    const cancel = actions.filter(
+    const cancel = postbackActions.filter(
       (a) => parsePostbackData(a.data ?? "")?.action === "cancel",
     );
     expect(attend).toHaveLength(2);
@@ -52,6 +55,13 @@ describe("announce", () => {
     // displayText を付けない = タップしてもトークに何も流れない(通知抑制の運用判断)
     expect(attend[0].displayText).toBeUndefined();
     expect(cancel[0].displayText).toBeUndefined();
+
+    // サイレントの代わりに、押した本人が登録を確認できる公開ページへの導線を置く
+    const uriActions = buttons
+      .map((b) => b.action)
+      .filter((a): a is messagingApi.URIAction => a?.type === "uri");
+    expect(uriActions).toHaveLength(1);
+    expect(uriActions[0].uri).toBe("https://example.com/p/token-xxxx");
   });
 });
 

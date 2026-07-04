@@ -12,6 +12,12 @@ export type AnnounceSessionInput = {
 export type AnnounceInput = {
   eventTitle: string;
   sessions: AnnounceSessionInput[];
+  /**
+   * 参加状況の公開ページURL(/p/[token])。
+   * タップはサイレント(displayTextなし)のため、押した本人が
+   * 「登録されたか」を確認できる唯一の導線としてFlexに載せる。
+   */
+  statusUrl: string;
 };
 
 export type GroupInviteInput = {

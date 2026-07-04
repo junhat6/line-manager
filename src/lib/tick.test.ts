@@ -4,7 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { messagingApi } from "@line/bot-sdk";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Db } from "@/db/client";
 import * as schema from "@/db/schema";
 import {
@@ -73,6 +73,8 @@ describe("runTick", () => {
   beforeEach(async () => {
     db = await createTestDb();
     sent = [];
+    // announce は参加状況ページのURLを組み立てるためベースURLを必要とする
+    vi.stubEnv("APP_BASE_URL", "https://app.example.com");
   });
 
   it("期限到来したpending行を送信し、2回目のtickでは再送しない(冪等)", async () => {

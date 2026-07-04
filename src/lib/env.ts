@@ -17,3 +17,20 @@ export function getEnv(): Env {
   cached ??= envSchema.parse(process.env);
   return cached;
 }
+
+/**
+ * 参加状況の公開ページURLを組み立てるためのベースURL。
+ * envSchema には入れない — Vercel 上では VERCEL_PROJECT_PRODUCTION_URL から
+ * 自動解決できるので必須にすると逆に手間が増える。APP_BASE_URL は
+ * 独自ドメイン等で明示したい場合の上書き用(そちらが優先)。
+ * 未設定ならアナウンス組み立て時に例外→チェックリストに理由が表示される。
+ */
+export function getAppBaseUrl(): string {
+  const explicit = process.env.APP_BASE_URL;
+  if (explicit) return explicit.replace(/\/+$/, "");
+  const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  if (vercelHost) return `https://${vercelHost}`;
+  throw new Error(
+    "APP_BASE_URL が未設定です(参加状況ページのURLをアナウンスに載せるため、アプリの公開URLを設定してください)",
+  );
+}
