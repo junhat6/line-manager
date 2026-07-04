@@ -140,9 +140,8 @@ export default async function SettingsPage() {
                   defaultValue={surveyUrlRepeat}
                 />
               </Field>
-              <Field>
-                <SubmitButton className="w-fit">保存する</SubmitButton>
-              </Field>
+              {/* Fieldの中に置くと *:w-full で全幅に伸ばされるためFieldGroup直下に置く */}
+              <SubmitButton className="w-fit">保存する</SubmitButton>
             </FieldGroup>
           </form>
         </CardContent>

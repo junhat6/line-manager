@@ -564,8 +564,9 @@ function SessionCard({
               <FieldDescription className="text-xs">
                 開催日時を変えると、未送信の前日・当日案内の予約時刻も自動で追従します。
               </FieldDescription>
-              <SubmitButton className="w-fit">保存する</SubmitButton>
             </Field>
+            {/* Fieldの中に置くと *:w-full で全幅に伸ばされるためFieldGroup直下に置く */}
+            <SubmitButton className="w-fit">保存する</SubmitButton>
           </FieldGroup>
         </form>
       </CardContent>
