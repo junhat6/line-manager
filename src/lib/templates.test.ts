@@ -49,8 +49,9 @@ describe("announce", () => {
     );
     expect(attend).toHaveLength(2);
     expect(cancel).toHaveLength(2);
-    // displayText により、タップが本人の発言としてグループに表示される
-    expect(attend[0].displayText).toContain("参加します");
+    // displayText を付けない = タップしてもトークに何も流れない(通知抑制の運用判断)
+    expect(attend[0].displayText).toBeUndefined();
+    expect(cancel[0].displayText).toBeUndefined();
   });
 });
 

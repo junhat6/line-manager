@@ -14,8 +14,9 @@ type FlexComponent = messagingApi.FlexComponent;
 
 /**
  * 開催アナウンス。日程ごとに「参加する」ボタンを置く。
- * displayText により、タップした本人の発言として「◯◯ 参加します!」がグループに
- * 流れる — リアクション運用に近い可視性を、返信メッセージ(課金対象)なしで得るため。
+ * postback に displayText を付けない — タップしてもトークに何も流れず、
+ * LINE標準の投票と同じ静かな挙動になる(通知が増える方が害という運用判断)。
+ * 誰が参加表明したかは管理画面の参加者リストで確認する。
  */
 export function buildAnnounceMessages(input: AnnounceInput): Message[] {
   const sessionBlocks: FlexComponent[] = input.sessions.flatMap(
@@ -28,7 +29,6 @@ export function buildAnnounceMessages(input: AnnounceInput): Message[] {
           type: "postback",
           label: `${s.label} に参加`,
           data: encodePostbackData({ action: "attend", sessionId: s.sessionId }),
-          displayText: `${s.label} 参加します!`,
         },
       },
       {
@@ -39,7 +39,6 @@ export function buildAnnounceMessages(input: AnnounceInput): Message[] {
           type: "postback",
           label: `${s.label} を取り消す`,
           data: encodePostbackData({ action: "cancel", sessionId: s.sessionId }),
-          displayText: `${s.label} の参加を取り消します`,
         },
       },
     ],
@@ -65,7 +64,7 @@ export function buildAnnounceMessages(input: AnnounceInput): Message[] {
             },
             {
               type: "text",
-              text: "以下の日程で開催します!\n参加する日程のボタンを押してください(両方参加もOK)",
+              text: "以下の日程で開催します!\n参加する日程のボタンを押してください(両方参加もOK)\n※タップ内容はトークに流れず、そのまま記録されます",
               size: "sm",
               wrap: true,
             },
