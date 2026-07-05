@@ -4,6 +4,8 @@ import {
   CircleAlertIcon,
   ClockIcon,
   ExternalLinkIcon,
+  Link2Icon,
+  Link2OffIcon,
   TriangleAlertIcon,
   XIcon,
 } from "lucide-react";
@@ -123,6 +125,7 @@ export default async function EventDetailPage({
   const mainGroup = groupRows.find((g) => g.kind === "main");
   const bindableGroups = groupRows.filter((g) => g.kind !== "main");
   const checklist = buildChecklist(sessionRows, smRows);
+  const sessionById = new Map(sessionRows.map((s) => [s.id, s]));
   const status = STATUS_LABELS[event.status];
 
   return (
@@ -205,6 +208,12 @@ export default async function EventDetailPage({
                   <TableCell>{item.label}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {item.sessionLabel ?? "全体"}
+                    {item.sessionId && (
+                      <GroupBindingHint
+                        session={sessionById.get(item.sessionId)}
+                        groups={groupRows}
+                      />
+                    )}
                   </TableCell>
                   <TableCell className="whitespace-normal">
                     <StatusCell item={item} />
@@ -231,14 +240,44 @@ export default async function EventDetailPage({
                 (r) => r.attendance.sessionId === session.id,
               )}
               bindableGroups={bindableGroups}
-              surveyRow={smRows.find(
-                (r) => r.sessionId === session.id && r.kind === "survey",
-              )}
+              messageRows={smRows.filter((r) => r.sessionId === session.id)}
             />
           ))}
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * チェックリストの日程列に出す、日程別LINEグループの紐付け状態。
+ * 未紐付けのまま自動送信の時刻を迎えると失敗するため、
+ * テーブルを下にスクロールして日程カードを見なくても気づけるようにする。
+ */
+function GroupBindingHint({
+  session,
+  groups,
+}: {
+  session: Session | undefined;
+  groups: LineGroup[];
+}) {
+  if (!session) return null;
+  const group = groups.find((g) => g.lineGroupId === session.lineGroupId);
+  if (session.lineGroupId && group) {
+    return (
+      <span className="mt-0.5 flex items-center gap-1 text-xs">
+        <Link2Icon className="size-3 shrink-0" />
+        {group.name ?? group.lineGroupId}
+      </span>
+    );
+  }
+  return (
+    <span className="mt-0.5 flex items-center gap-1 text-xs text-warning">
+      <Link2OffIcon className="size-3 shrink-0" />
+      {session.lineGroupId
+        ? "紐付け先グループが見つかりません"
+        : "グループ未紐付け"}
+    </span>
   );
 }
 
@@ -323,12 +362,51 @@ function ActionCell({
   );
 }
 
+/**
+ * 自動送信(前日・当日・アンケート)の予約日時フィールド。
+ * 送信済みの行は履歴なので disabled にする(disabled の入力はFormDataに
+ * 含まれず、サーバー側も「空欄=変更しない」と解釈する)。
+ */
+function ScheduledAtField({
+  sessionId,
+  name,
+  label,
+  row,
+}: {
+  sessionId: string;
+  name: string;
+  label: string;
+  row: ScheduledMessage | undefined;
+}) {
+  const editable =
+    row && (row.status === "pending" || row.status === "failed");
+  return (
+    <Field data-disabled={!editable || undefined}>
+      <FieldLabel htmlFor={`${name}-${sessionId}`}>{label}</FieldLabel>
+      <Input
+        id={`${name}-${sessionId}`}
+        type="datetime-local"
+        name={name}
+        defaultValue={
+          row?.scheduledAt ? formatJstForInput(row.scheduledAt) : ""
+        }
+        disabled={!editable}
+      />
+      {!editable && (
+        <FieldDescription className="text-xs">
+          送信済みのため変更できません
+        </FieldDescription>
+      )}
+    </Field>
+  );
+}
+
 function SessionCard({
   session,
   eventId,
   attendanceRows,
   bindableGroups,
-  surveyRow,
+  messageRows,
 }: {
   session: Session;
   eventId: string;
@@ -337,7 +415,8 @@ function SessionCard({
     member: typeof members.$inferSelect;
   }[];
   bindableGroups: LineGroup[];
-  surveyRow: ScheduledMessage | undefined;
+  /** この日程に紐づく scheduled_messages(送信日時フィールドの現在値・編集可否に使う) */
+  messageRows: ScheduledMessage[];
 }) {
   const attending = attendanceRows.filter(
     (r) => r.attendance.status === "attending",
@@ -348,9 +427,8 @@ function SessionCard({
   const boundGroup = bindableGroups.find(
     (g) => g.lineGroupId === session.lineGroupId,
   );
-  const surveyEditable =
-    surveyRow &&
-    (surveyRow.status === "pending" || surveyRow.status === "failed");
+  const rowOf = (kind: ScheduledMessage["kind"]) =>
+    messageRows.find((r) => r.kind === kind);
   const groupItems = [
     { value: "", label: "未紐付け" },
     ...bindableGroups.map((g) => ({
@@ -539,31 +617,28 @@ function SessionCard({
               />
             </Field>
 
-            <Field data-disabled={!surveyEditable || undefined}>
-              <FieldLabel htmlFor={`surveyAt-${session.id}`}>
-                アンケート送信日時
-              </FieldLabel>
-              <Input
-                id={`surveyAt-${session.id}`}
-                type="datetime-local"
-                name="surveyAt"
-                defaultValue={
-                  surveyRow?.scheduledAt
-                    ? formatJstForInput(surveyRow.scheduledAt)
-                    : ""
-                }
-                disabled={!surveyEditable}
-              />
-              {!surveyEditable && (
-                <FieldDescription className="text-xs">
-                  アンケートは送信済みのため変更できません
-                </FieldDescription>
-              )}
-            </Field>
+            <ScheduledAtField
+              sessionId={session.id}
+              name="dayBeforeAt"
+              label="前日案内の送信日時"
+              row={rowOf("day_before")}
+            />
+            <ScheduledAtField
+              sessionId={session.id}
+              name="dayOfAt"
+              label="当日案内の送信日時"
+              row={rowOf("day_of")}
+            />
+            <ScheduledAtField
+              sessionId={session.id}
+              name="surveyAt"
+              label="アンケートの送信日時"
+              row={rowOf("survey")}
+            />
 
             <Field>
               <FieldDescription className="text-xs">
-                開催日時を変えると、未送信の前日・当日案内の予約時刻も自動で追従します。
+                開催日時を変えると、変更していない送信日時も同じ時間差で自動的にずれます。個別に変更した送信日時はそのまま使われます。
               </FieldDescription>
             </Field>
             {/* Fieldの中に置くと *:w-full で全幅に伸ばされるためFieldGroup直下に置く */}

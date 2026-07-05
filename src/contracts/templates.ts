@@ -51,3 +51,10 @@ export type SurveyInput = {
   firstTimeUrl: string;
   repeatUrl: string;
 };
+
+export type PollUrlInput = {
+  /** 管理画面で編集できる本文(URLは含めない) */
+  body: string;
+  /** 調整さんのイベントページURL。本文の末尾に付加される */
+  url: string;
+};

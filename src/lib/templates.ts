@@ -5,6 +5,7 @@ import type {
   DayBeforeInput,
   DayOfInput,
   GroupInviteInput,
+  PollUrlInput,
   SlideRequestInput,
   SurveyInput,
 } from "@/contracts/templates";
@@ -153,6 +154,23 @@ export function buildDayOfMessages(input: DayOfInput): Message[] {
   }
   lines.push("", "それでは、のちほどお会いしましょう!");
   return [{ type: "text", text: lines.join("\n") }];
+}
+
+/**
+ * 日程調整URL投稿の既定本文。
+ * 開始フォームのプリフィルと、本文カラム追加前の既存行のフォールバックの両方で使う
+ * (2箇所が同じ文面である保証をここで持つ)。
+ */
+export function defaultPollMessageBody(month: number): string {
+  return [
+    `📅 ${month}月交流会の日程調整です!`,
+    "参加できる日の入力をお願いします👇",
+  ].join("\n");
+}
+
+/** 日程調整のURL投稿。本文は管理画面で編集できるため、URLの付加だけを担う */
+export function buildPollUrlMessages(input: PollUrlInput): Message[] {
+  return [{ type: "text", text: `${input.body}\n${input.url}` }];
 }
 
 /** 要件で指定された定型文そのまま。URLのみsettingsで差し替え可能 */

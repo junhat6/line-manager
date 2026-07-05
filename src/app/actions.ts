@@ -8,6 +8,7 @@ import { z } from "zod";
 import {
   createEventSchema,
   saveSettingsSchema,
+  startSchedulePollSchema,
   updateSessionSchema,
   type ActionResult,
 } from "@/contracts/forms";
@@ -39,8 +40,10 @@ import {
   toJstParts,
 } from "@/lib/jst";
 import { pushMessages } from "@/lib/line/client";
+import { resolveScheduledAt } from "@/lib/reschedule";
 import { requireMainGroup, sendScheduledMessage } from "@/lib/send";
 import { SETTING_KEYS, setSetting } from "@/lib/settings";
+import { buildPollUrlMessages, defaultPollMessageBody } from "@/lib/templates";
 
 function text(formData: FormData, key: string): string {
   const v = formData.get(key);
@@ -158,7 +161,10 @@ export async function updateSession(
   formData: FormData,
 ): Promise<ActionResult> {
   try {
-    const surveyAtRaw = text(formData, "surveyAt").trim();
+    const optionalAt = (key: string): Date | null => {
+      const raw = text(formData, key).trim();
+      return raw ? parseJstFromInput(raw) : null;
+    };
     const input = updateSessionSchema.parse({
       sessionId: text(formData, "sessionId"),
       eventId: text(formData, "eventId"),
@@ -168,10 +174,25 @@ export async function updateSession(
       slideUrl: text(formData, "slideUrl"),
       meetingInfo: text(formData, "meetingInfo"),
       dayFlow: text(formData, "dayFlow"),
-      surveyAt: surveyAtRaw ? parseJstFromInput(surveyAtRaw) : null,
+      dayBeforeAt: optionalAt("dayBeforeAt"),
+      dayOfAt: optionalAt("dayOfAt"),
+      surveyAt: optionalAt("surveyAt"),
     });
 
     const db = getDb();
+    // 開催日時の変更量(追従計算)と「フォーム値をユーザーが触ったか」の
+    // 判別のため、更新前の値を先に読む
+    const currentRows = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, input.sessionId));
+    const current = currentRows[0];
+    if (!current) return { ok: false, message: "日程が見つかりません" };
+    const smRows = await db
+      .select()
+      .from(scheduledMessages)
+      .where(eq(scheduledMessages.sessionId, input.sessionId));
+
     await db
       .update(sessions)
       .set({
@@ -184,13 +205,21 @@ export async function updateSession(
       })
       .where(eq(sessions.id, input.sessionId));
 
-    // 日程変更に予約時刻を追従させる。failed行もpendingに戻して再アーム
-    // (URL未設定などで失敗した後、設定を直せば次のtickで自動送信されるように)。
-    // 送信済み(sent)は履歴なので触らない。
+    // 予約時刻の更新。カスタマイズ値は尊重し、触っていない値は開催日時の
+    // 変更に追従させる(判断はresolveScheduledAt)。failed行もpendingに戻して
+    // 再アームする(URL未設定などで失敗した後、設定を直せば次のtickで自動送信
+    // されるように)。送信済み(sent)は履歴なので触らない。
+    const shiftMs = input.startAt.getTime() - current.startAt.getTime();
     const reschedule = async (
       kind: "day_before" | "day_of" | "survey",
-      scheduledAt: Date | null,
+      formValue: Date | null,
     ) => {
+      const row = smRows.find((r) => r.kind === kind);
+      const scheduledAt = resolveScheduledAt(
+        formValue,
+        row?.scheduledAt ?? null,
+        shiftMs,
+      );
       if (!scheduledAt) return;
       await db
         .update(scheduledMessages)
@@ -203,8 +232,8 @@ export async function updateSession(
           ),
         );
     };
-    await reschedule("day_before", dayBeforeAt15(input.startAt));
-    await reschedule("day_of", dayOfAt9(input.startAt));
+    await reschedule("day_before", input.dayBeforeAt);
+    await reschedule("day_of", input.dayOfAt);
     await reschedule("survey", input.surveyAt);
 
     revalidatePath(`/events/${input.eventId}`);
@@ -356,9 +385,16 @@ const DEFAULT_SESSION_HOUR = 19;
 /**
  * 来月分の日程調整を開始する:
  * 調整さんに来月全日程を候補にしたイベントを作成し、URLをメイングループに投稿する。
+ * 投稿本文はフォームで編集でき、再投稿でも同じ本文を使うため行に保存する。
  */
-export async function startSchedulePoll(): Promise<ActionResult> {
+export async function startSchedulePoll(
+  formData: FormData,
+): Promise<ActionResult> {
   try {
+    const input = startSchedulePollSchema.parse({
+      message: text(formData, "message"),
+    });
+
     const db = getDb();
     const targetMonth = nextMonthStart(new Date());
     const month = toJstParts(targetMonth).month;
@@ -373,7 +409,7 @@ export async function startSchedulePoll(): Promise<ActionResult> {
 
     const [poll] = await db
       .insert(schedulePolls)
-      .values({ title, chouseisanUrl: url, targetMonth })
+      .values({ title, chouseisanUrl: url, targetMonth, message: input.message })
       .returning();
 
     // URL投稿に失敗しても調整さんイベント自体は作成済みなので、行は残して
@@ -426,16 +462,10 @@ async function postPollUrlToMainGroup(
   const month = toJstParts(poll.targetMonth).month;
   await pushMessages(
     target.to,
-    [
-      {
-        type: "text",
-        text: [
-          `📅 ${month}月交流会の日程調整です!`,
-          "参加できる日の入力をお願いします👇",
-          poll.chouseisanUrl,
-        ].join("\n"),
-      },
-    ],
+    buildPollUrlMessages({
+      body: poll.message ?? defaultPollMessageBody(month),
+      url: poll.chouseisanUrl,
+    }),
     target.channel,
   );
   await db

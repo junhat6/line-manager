@@ -6,8 +6,10 @@ import {
   buildDayBeforeMessages,
   buildDayOfMessages,
   buildGroupInviteMessages,
+  buildPollUrlMessages,
   buildSlideRequestMessages,
   buildSurveyMessages,
+  defaultPollMessageBody,
 } from "./templates";
 
 const SESSION_ID = "0d4ee5c2-7c3a-4c4c-9a5e-4f8a0d9b6c1a";
@@ -143,5 +145,28 @@ describe("テキストテンプレート", () => {
     expect(text).toContain("https://example.com/first");
     expect(text).toContain("▽回答が2回目以降の方用");
     expect(text).toContain("https://example.com/repeat");
+  });
+});
+
+describe("poll url", () => {
+  it("編集済みの本文の末尾にURLを付加する", () => {
+    const text = textOf(
+      buildPollUrlMessages({
+        body: "8月の日程調整です!毎回19:00開始です",
+        url: "https://chouseisan.com/s?h=xxxx",
+      }),
+    );
+    expect(text).toBe(
+      "8月の日程調整です!毎回19:00開始です\nhttps://chouseisan.com/s?h=xxxx",
+    );
+  });
+
+  it("既定本文は対象月を含む(フォームのプリフィルと既存行のフォールバックで共用)", () => {
+    const body = defaultPollMessageBody(8);
+    expect(body).toContain("8月交流会の日程調整");
+    const text = textOf(
+      buildPollUrlMessages({ body, url: "https://chouseisan.com/s?h=xxxx" }),
+    );
+    expect(text.endsWith("https://chouseisan.com/s?h=xxxx")).toBe(true);
   });
 });

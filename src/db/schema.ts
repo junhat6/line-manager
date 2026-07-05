@@ -171,6 +171,11 @@ export const schedulePolls = pgTable("schedule_polls", {
   title: text("title").notNull(),
   /** 調整さんのイベントページURL(グループに共有するもの) */
   chouseisanUrl: text("chouseisan_url").notNull(),
+  /**
+   * グループ投稿の本文(開始フォームで編集可能)。URLは送信時に末尾へ付加する。
+   * null はカラム追加前の既存行で、既定文面にフォールバックする。
+   */
+  message: text("message"),
   /** 候補日の対象月(その月の1日 JST)。候補ラベル「7/18(土)」→日付の復元に使う */
   targetMonth: timestamp("target_month", { withTimezone: true }).notNull(),
   status: pollStatusEnum("status").notNull().default("open"),

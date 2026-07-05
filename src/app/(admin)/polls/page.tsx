@@ -30,9 +30,18 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import { getDb } from "@/db/client";
 import { schedulePolls } from "@/db/schema";
+import { nextMonthStart } from "@/lib/chouseisan";
 import { formatJstDateTimeLabel, toJstParts } from "@/lib/jst";
+import { defaultPollMessageBody } from "@/lib/templates";
 
 export const dynamic = "force-dynamic";
 
@@ -43,26 +52,57 @@ export default async function PollsPage() {
     .from(schedulePolls)
     .orderBy(desc(schedulePolls.createdAt));
 
+  // フォームのプリフィル用。dynamic="force-dynamic" なのでリクエスト時点の来月が入る
+  const nextMonth = toJstParts(nextMonthStart(new Date())).month;
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">日程調整</h1>
-        <ToastForm action={startSchedulePoll}>
-          <ConfirmButton
-            confirmMessage="調整さんに来月全日程の日程調整を作成し、URLをメイングループにLINE送信します。よろしいですか?(グループ人数分のメッセージ数を消費します)"
-            actionLabel="開始する"
-            variant="default"
-            size="default"
-          >
-            <PlusIcon data-icon="inline-start" />
-            来月の日程調整を開始
-          </ConfirmButton>
-        </ToastForm>
-      </div>
+      <h1 className="text-xl font-semibold">日程調整</h1>
       <p className="max-w-prose text-sm text-pretty text-muted-foreground">
         「開始」で調整さん(chouseisan.com)に来月の全日程を候補にした出欠表を作り、URLをメイングループへ自動投稿します。
         回答が集まったら「結果を取り込む」で、◯=1点・△=0.5点の集計上位2日程のイベントが自動作成されます(同点は早い日付を優先)。
       </p>
+
+      <Card>
+        <CardHeader className="border-b">
+          <CardTitle>来月({nextMonth}月)の日程調整を開始</CardTitle>
+          <CardDescription>
+            下のメッセージと調整さんのURLがメイングループに投稿されます。文面は自由に編集できます。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ToastForm action={startSchedulePoll}>
+            <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel htmlFor="poll-message">
+                  グループに投稿するメッセージ
+                </FieldLabel>
+                <Textarea
+                  id="poll-message"
+                  name="message"
+                  rows={3}
+                  required
+                  defaultValue={defaultPollMessageBody(nextMonth)}
+                />
+                <FieldDescription className="text-xs">
+                  末尾に調整さんのURLが自動で付きます
+                </FieldDescription>
+              </Field>
+              {/* Fieldの中に置くと *:w-full で全幅に伸ばされるためFieldGroup直下に置く */}
+              <ConfirmButton
+                confirmMessage="調整さんに来月全日程の日程調整を作成し、上のメッセージをメイングループにLINE送信します。よろしいですか?(グループ人数分のメッセージ数を消費します)"
+                actionLabel="開始する"
+                variant="default"
+                size="default"
+                className="w-fit"
+              >
+                <PlusIcon data-icon="inline-start" />
+                来月の日程調整を開始
+              </ConfirmButton>
+            </FieldGroup>
+          </ToastForm>
+        </CardContent>
+      </Card>
 
       {polls.length === 0 ? (
         <Empty>

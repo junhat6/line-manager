@@ -14,8 +14,10 @@ export const MESSAGE_KIND_LABELS: Record<MessageKind, string> = {
   announce: "開催アナウンス(参加ボタン付き)",
   group_invite: "日程別グループ案内",
   slide_request: "自己紹介スライド案内",
-  day_before: "前日案内(前日15:00)",
-  day_of: "当日案内(当日9:00)",
+  // 送信時刻は日程ごとに変更できるため、ラベルに時刻を焼き込まない
+  // (実際の予約時刻はチェックリストの状態列に出る)
+  day_before: "前日案内",
+  day_of: "当日案内",
   survey: "終了後アンケート",
 };
 

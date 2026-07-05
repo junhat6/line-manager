@@ -18,7 +18,7 @@ export default function NewEventPage() {
         <h1 className="text-xl font-semibold">新しいイベント</h1>
         <p className="text-sm text-pretty text-muted-foreground">
           LINE日程調整の結果から選んだ開催日程(最大2つ)を登録します。
-          作成すると、前日15:00・当日9:00・アンケートの自動送信が予約されます。
+          作成すると、前日案内(前日15:00)・当日案内(当日9:00)・アンケート(当日21:00)の自動送信が予約されます。送信日時はイベント詳細で変更できます。
         </p>
       </div>
 

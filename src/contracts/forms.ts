@@ -41,7 +41,19 @@ export const updateSessionSchema = z.object({
   slideUrl: optionalUrl,
   meetingInfo: optionalText,
   dayFlow: optionalText,
+  /** 自動送信3種の予約日時。null=フォーム空欄(送信済みでdisabled等)で、変更しない */
+  dayBeforeAt: z.date().nullable(),
+  dayOfAt: z.date().nullable(),
   surveyAt: z.date().nullable(),
+});
+
+export const startSchedulePollSchema = z.object({
+  /** メイングループに投稿する本文。調整さんのURLは送信時に末尾へ付加される */
+  message: z
+    .string()
+    .trim()
+    .min(1, "グループに投稿するメッセージを入力してください")
+    .max(4000, "メッセージが長すぎます(4000文字以内)"),
 });
 
 export const saveSettingsSchema = z.object({

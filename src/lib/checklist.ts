@@ -10,6 +10,8 @@ export type ChecklistItem = {
   id: string;
   kind: MessageKind;
   label: string;
+  /** announce はイベント全体宛なので null。グループ紐付け状態の表示に使う */
+  sessionId: string | null;
   /** announce はイベント全体宛なので null */
   sessionLabel: string | null;
   trigger: "manual" | "auto";
@@ -46,6 +48,7 @@ export function buildChecklist(
       id: r.id,
       kind: r.kind,
       label: MESSAGE_KIND_LABELS[r.kind],
+      sessionId: r.sessionId,
       sessionLabel: r.sessionId ? (sessionLabels.get(r.sessionId) ?? null) : null,
       trigger: MESSAGE_KIND_TRIGGER[r.kind],
       status: r.status,
