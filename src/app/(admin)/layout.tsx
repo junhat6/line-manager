@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { AdminNav } from "@/components/AdminNav";
+import { Button } from "@/components/ui/button";
 
 /**
  * 管理画面共通のナビ。route group (admin) に閉じ込める —
  * 参加者向け公開ページ(/p/[token])に管理画面へのリンクを見せない
- * (踏むとBasic認証ダイアログが出て参加者を混乱させる)ため。
+ * (踏むとログイン画面に飛ばされて参加者を混乱させる)ため。
  */
 export default function AdminLayout({
   children,
@@ -28,6 +29,17 @@ export default function AdminLayout({
             交流会運営支援
           </Link>
           <AdminNav />
+          {/* JS不要のプレーンなform。遷移先でcookieが失効するので画面更新の考慮も不要 */}
+          <form method="post" action="/api/auth/logout" className="ml-auto">
+            <Button
+              type="submit"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+            >
+              ログアウト
+            </Button>
+          </form>
         </div>
       </header>
       <main id="main" className="mx-auto max-w-5xl px-6 py-8">

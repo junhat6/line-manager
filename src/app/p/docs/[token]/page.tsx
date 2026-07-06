@@ -15,9 +15,9 @@ import { getAppBaseUrl } from "@/lib/env";
 
 /**
  * 運営マニュアルの限定公開ページ。
- * /p/ 配下のGET/HEADは src/proxy.ts でBasic認証が免除され、
+ * /p/ 配下のGET/HEADは src/proxy.ts で管理画面ログインが免除され、
  * 推測不能なURL(DOCS_TOKEN)自体が認可を兼ねる — 参加状況ページ(/p/[token])と同じ方式。
- * Basic認証のID/パスワードを表示するページなので:
+ * 管理画面ログインのID/パスワードを表示するページなので:
  * - 原稿(docs/manual.md)には秘密を書かず、envからリクエスト時に描画する
  *   (リポジトリに秘密が残らず、パスワード変更も自動で反映される)
  * - force-dynamic は必須: 静的化すると資格情報入りHTMLがビルド成果物や共有キャッシュに固定される
@@ -79,7 +79,7 @@ export default async function ManualPage({
         <CardHeader>
           <CardTitle>管理画面のログイン情報</CardTitle>
           <CardDescription>
-            管理画面を開くとブラウザがユーザー名とパスワードを聞いてくるので、そのまま入力してください。運営メンバー以外に共有しないでください。
+            管理画面を開くとログイン画面が表示されるので、以下のIDとパスワードを入力してください。運営メンバー以外に共有しないでください。
           </CardDescription>
         </CardHeader>
         <CardContent>

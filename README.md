@@ -28,12 +28,12 @@
 - **Next.js (App Router) + TypeScript** — 管理画面 + Webhook + cron APIを1アプリに集約
 - **Supabase Postgres + Drizzle ORM** — スキーマは `src/db/schema.ts` がコントラクト
 - **@line/bot-sdk** — 署名検証とMessaging API
-- **Basic認証**(`src/proxy.ts`) — 管理画面の保護。webhook/cronは各自の認証(署名 / CRON_SECRET)
+- **ログイン認証**(`src/proxy.ts` + `/login`) — 署名付きセッションcookieで管理画面を保護。webhook/cronは各自の認証(署名 / CRON_SECRET)
 - コントラクト層は `src/contracts/`(postbackデータ・フォーム入力・テンプレート変数のzodスキーマ)
 
 ```
 LINEグループ ──webhook──▶ /api/line/webhook ──▶ 参加記録・グループ登録
-運営者 ──Basic認証──▶ 管理画面 ──▶ 手動送信 / チェックリスト確認
+運営者 ──ログイン──▶ 管理画面 ──▶ 手動送信 / チェックリスト確認
 cron-job.org ──5分毎──▶ /api/cron/tick ──▶ 期限到来した予約メッセージを送信
 ```
 
@@ -92,7 +92,7 @@ DATABASE_URL="postgresql://..." npm run db:migrate
 
 ### 6. 運営マニュアルの共有(任意)
 
-運営メンバー向けのWebマニュアル(Basic認証のID/パスワード入り)を、Notionの「リンクを知っている人だけ閲覧可」と同じ方式で限定公開できます。
+運営メンバー向けのWebマニュアル(管理画面ログインのID/パスワード入り)を、Notionの「リンクを知っている人だけ閲覧可」と同じ方式で限定公開できます。
 
 1. `openssl rand -hex 16` などでトークンを生成し、Vercelの環境変数 `DOCS_TOKEN` に設定して再デプロイ
 2. `https://<デプロイ先>/p/docs/<DOCS_TOKEN>` を運営メンバーに共有(LINEなど)
@@ -106,7 +106,7 @@ DATABASE_URL="postgresql://..." npm run db:migrate
 ```bash
 cp .env.example .env.local   # 値を埋める
 npm install
-npm run dev                  # http://localhost:3000 (Basic認証あり)
+npm run dev                  # http://localhost:3000 (ログイン画面あり)
 ```
 
 Webhookの実機確認はトンネル(例: `ngrok http 3000`)を張り、そのURLをLINE DevelopersのWebhook URLに一時設定します。
