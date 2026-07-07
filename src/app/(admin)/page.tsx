@@ -19,7 +19,6 @@ export const dynamic = "force-dynamic";
 
 const STATUS_LABELS = {
   draft: { text: "準備中", variant: "secondary" },
-  announced: { text: "アナウンス済み", variant: "default" },
   done: { text: "完了", variant: "outline" },
 } as const;
 

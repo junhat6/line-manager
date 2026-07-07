@@ -1,6 +1,6 @@
 ---
 name: line-webhook-test
-description: LINE webhook(join/leave/postback)の署名付き偽装リクエストをローカル開発サーバーに送信して動作確認する。実 LINE チャネルや ngrok は不要
+description: LINE webhook(join/leave)の署名付き偽装リクエストをローカル開発サーバーに送信して動作確認する。実 LINE チャネルや ngrok は不要
 ---
 
 # LINE Webhook ローカルテスト
@@ -29,29 +29,18 @@ node .claude/skills/line-webhook-test/scripts/send-webhook.mjs --type join
 # グループ退出イベント(line_groups.active が false になる)
 node .claude/skills/line-webhook-test/scripts/send-webhook.mjs --type leave
 
-# 参加ボタンの postback(attendances に upsert される)
-node .claude/skills/line-webhook-test/scripts/send-webhook.mjs \
-  --type postback --action attend --session-id <実在する sessions.id の UUID>
-
-# 取消ボタン
-node .claude/skills/line-webhook-test/scripts/send-webhook.mjs \
-  --type postback --action cancel --session-id <UUID>
-
 # 送信せずペイロードと署名だけ確認する
 node .claude/skills/line-webhook-test/scripts/send-webhook.mjs --type join --dry-run
 ```
 
-オプション: `--group-id` / `--user-id`(既定はダミー ID)、`--url`(既定は localhost:3000)、
+オプション: `--group-id`(既定はダミー ID)、`--url`(既定は localhost:3000)、
 `--channel N`(既定は 1。シークレットを `LINE_CHANNEL_N_SECRET` から読み、
 `--url` 未指定なら本番と同じく `?channel=N` を付けて送る。マルチチャネル構成のテスト用)
 
 ## 期待される挙動と注意
 
-- **postback の `--session-id` は DB に実在する UUID を渡すこと**。
-  存在しない ID はハンドラが黙って無視する仕様(`handlePostback` 参照)なので、
-  200 が返っても attendances には何も書かれない
-- LINE プロフィール API の呼び出し(`getGroupSummary` / `getProfile`)はダミートークンでは
-  失敗するが、ハンドラが catch して続行する設計。メンバーは `(名前未取得)` で作成される
+- LINE グループ名の取得(`getGroupSummary`)はダミートークンでは失敗するが、
+  ハンドラが catch して続行する設計。グループ名は null で記録される
 - 401 が返る場合はスクリプトとサーバーで `LINE_CHANNEL_SECRET` が食い違っている
-- テスト後は `line_groups` / `members` / `attendances` に入ったダミーデータを
+- テスト後は `line_groups` に入ったダミーデータを
   `npm run db:studio` で確認・掃除できる

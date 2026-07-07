@@ -1,7 +1,5 @@
 import type { messagingApi } from "@line/bot-sdk";
-import { encodePostbackData } from "@/contracts/postback";
 import type {
-  AnnounceInput,
   DayBeforeInput,
   DayOfInput,
   GroupInviteInput,
@@ -11,82 +9,6 @@ import type {
 } from "@/contracts/templates";
 
 type Message = messagingApi.Message;
-type FlexComponent = messagingApi.FlexComponent;
-
-/**
- * 開催アナウンス。日程ごとに「参加する」ボタンを置く。
- * postback に displayText を付けない — タップしてもトークに何も流れず、
- * LINE標準の投票と同じ静かな挙動になる(通知が増える方が害という運用判断)。
- * 押した本人へのフィードバックは「参加状況を確認」ボタン(公開ページ)が担う。
- */
-export function buildAnnounceMessages(input: AnnounceInput): Message[] {
-  const sessionBlocks: FlexComponent[] = input.sessions.flatMap(
-    (s): FlexComponent[] => [
-      {
-        type: "button",
-        style: "primary",
-        height: "sm",
-        action: {
-          type: "postback",
-          label: `${s.label} に参加`,
-          data: encodePostbackData({ action: "attend", sessionId: s.sessionId }),
-        },
-      },
-      {
-        type: "button",
-        style: "link",
-        height: "sm",
-        action: {
-          type: "postback",
-          label: `${s.label} を取り消す`,
-          data: encodePostbackData({ action: "cancel", sessionId: s.sessionId }),
-        },
-      },
-    ],
-  );
-
-  return [
-    {
-      type: "flex",
-      altText: `【${input.eventTitle}】開催日程のお知らせ`,
-      contents: {
-        type: "bubble",
-        body: {
-          type: "box",
-          layout: "vertical",
-          spacing: "md",
-          contents: [
-            {
-              type: "text",
-              text: `🎉 ${input.eventTitle}`,
-              weight: "bold",
-              size: "lg",
-              wrap: true,
-            },
-            {
-              type: "text",
-              text: "以下の日程で開催します!\n参加する日程のボタンを押してください(両方参加もOK)\n※タップしてもトークには流れません。登録できたかは下の「参加状況を確認」から見られます",
-              size: "sm",
-              wrap: true,
-            },
-            ...sessionBlocks,
-            { type: "separator" },
-            {
-              type: "button",
-              style: "secondary",
-              height: "sm",
-              action: {
-                type: "uri",
-                label: "参加状況を確認",
-                uri: input.statusUrl,
-              },
-            },
-          ],
-        },
-      },
-    },
-  ];
-}
 
 export function buildGroupInviteMessages(input: GroupInviteInput): Message[] {
   return [

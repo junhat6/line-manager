@@ -53,7 +53,7 @@ export default async function GroupsPage() {
         <h1 className="text-xl font-semibold">LINEグループ</h1>
         <p className="max-w-prose text-sm text-pretty text-muted-foreground">
           ボットをLINEグループに招待すると、ここに自動で表示されます。
-          全体アナウンス用のグループを1つ「メイン」に設定してください。
+          全体連絡用のグループを1つ「メイン」に設定してください。
           日程別グループは、イベント詳細ページで日程に紐付けます。
         </p>
       </div>

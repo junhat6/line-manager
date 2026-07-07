@@ -1,8 +1,6 @@
 import type { messagingApi } from "@line/bot-sdk";
 import { describe, expect, it } from "vitest";
-import { parsePostbackData } from "@/contracts/postback";
 import {
-  buildAnnounceMessages,
   buildDayBeforeMessages,
   buildDayOfMessages,
   buildGroupInviteMessages,
@@ -12,60 +10,11 @@ import {
   defaultPollMessageBody,
 } from "./templates";
 
-const SESSION_ID = "0d4ee5c2-7c3a-4c4c-9a5e-4f8a0d9b6c1a";
-
 function textOf(messages: messagingApi.Message[]): string {
   const m = messages[0];
   if (m.type !== "text") throw new Error("text message expected");
   return (m as messagingApi.TextMessage).text;
 }
-
-describe("announce", () => {
-  it("日程ごとに参加ボタンと取消ボタン、末尾に参加状況確認ボタンを持つFlexを組み立てる", () => {
-    const [message] = buildAnnounceMessages({
-      eventTitle: "7月交流会",
-      sessions: [
-        { sessionId: SESSION_ID, label: "7/18(土) 19:00" },
-        { sessionId: SESSION_ID, label: "7/25(土) 19:00" },
-      ],
-      statusUrl: "https://example.com/p/token-xxxx",
-    });
-    expect(message.type).toBe("flex");
-    const flex = message as messagingApi.FlexMessage;
-    expect(flex.altText).toContain("7月交流会");
-
-    const bubble = flex.contents as messagingApi.FlexBubble;
-    const buttons = (bubble.body?.contents ?? []).filter(
-      (c): c is messagingApi.FlexButton => c.type === "button",
-    );
-    // 2日程 × (参加 + 取消) + 参加状況確認
-    expect(buttons).toHaveLength(5);
-
-    const postbackActions = buttons
-      .map((b) => b.action)
-      .filter(
-        (a): a is messagingApi.PostbackAction => a?.type === "postback",
-      );
-    const attend = postbackActions.filter(
-      (a) => parsePostbackData(a.data ?? "")?.action === "attend",
-    );
-    const cancel = postbackActions.filter(
-      (a) => parsePostbackData(a.data ?? "")?.action === "cancel",
-    );
-    expect(attend).toHaveLength(2);
-    expect(cancel).toHaveLength(2);
-    // displayText を付けない = タップしてもトークに何も流れない(通知抑制の運用判断)
-    expect(attend[0].displayText).toBeUndefined();
-    expect(cancel[0].displayText).toBeUndefined();
-
-    // サイレントの代わりに、押した本人が登録を確認できる公開ページへの導線を置く
-    const uriActions = buttons
-      .map((b) => b.action)
-      .filter((a): a is messagingApi.URIAction => a?.type === "uri");
-    expect(uriActions).toHaveLength(1);
-    expect(uriActions[0].uri).toBe("https://example.com/p/token-xxxx");
-  });
-});
 
 describe("テキストテンプレート", () => {
   it("グループ案内は招待リンクを含む", () => {

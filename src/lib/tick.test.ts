@@ -4,7 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { messagingApi } from "@line/bot-sdk";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/pglite";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
 import * as schema from "@/db/schema";
 import {
@@ -73,8 +73,6 @@ describe("runTick", () => {
   beforeEach(async () => {
     db = await createTestDb();
     sent = [];
-    // announce は参加状況ページのURLを組み立てるためベースURLを必要とする
-    vi.stubEnv("APP_BASE_URL", "https://app.example.com");
   });
 
   it("期限到来したpending行を送信し、2回目のtickでは再送しない(冪等)", async () => {
@@ -242,8 +240,10 @@ describe("runTick", () => {
     expect(sent[0].channel).toBe(2);
   });
 
-  it("メイングループ宛(announce)はメイングループのチャネルで送信される", async () => {
-    const { event } = await seedSession(db);
+  it("メイングループ宛(group_invite)はメイングループのチャネルで送信される", async () => {
+    const { event, session } = await seedSession(db, {
+      inviteLink: "https://line.me/ti/g/xxxx",
+    });
     await db.insert(lineGroups).values({
       lineGroupId: "G-main",
       name: "メイン",
@@ -251,7 +251,7 @@ describe("runTick", () => {
     });
     const [row] = await db
       .insert(scheduledMessages)
-      .values({ eventId: event.id, sessionId: null, kind: "announce" })
+      .values({ eventId: event.id, sessionId: session.id, kind: "group_invite" })
       .returning();
 
     const result = await sendScheduledMessage(db, row.id, { send });
@@ -289,27 +289,4 @@ describe("runTick", () => {
     expect(after.error).toContain("グループ一覧に見つかりません");
   });
 
-  it("announce送信でイベントがannouncedになる", async () => {
-    const { event, session } = await seedSession(db);
-    await db.insert(lineGroups).values({
-      lineGroupId: "G-main",
-      name: "メイン",
-      kind: "main",
-    });
-    void session;
-    const [row] = await db
-      .insert(scheduledMessages)
-      .values({ eventId: event.id, sessionId: null, kind: "announce" })
-      .returning();
-
-    const result = await sendScheduledMessage(db, row.id, { send });
-    expect(result?.ok).toBe(true);
-    expect(sent[0].to).toBe("G-main");
-
-    const [after] = await db
-      .select()
-      .from(events)
-      .where(eq(events.id, event.id));
-    expect(after.status).toBe("announced");
-  });
 });

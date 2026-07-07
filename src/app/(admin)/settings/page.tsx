@@ -44,7 +44,7 @@ export default async function SettingsPage() {
         <CardHeader>
           <CardTitle>メイングループ</CardTitle>
           <CardDescription>
-            全体アナウンスの送信先になるLINEグループです。
+            日程調整URLやグループ案内の送信先になるLINEグループです。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -59,7 +59,7 @@ export default async function SettingsPage() {
               <AlertTitle>未設定です</AlertTitle>
               <AlertDescription>
                 <Link href="/groups">グループ画面</Link>
-                で全体アナウンス用のグループを「メイン」に設定してください。
+                で全体連絡用のグループを「メイン」に設定してください。
               </AlertDescription>
             </Alert>
           )}

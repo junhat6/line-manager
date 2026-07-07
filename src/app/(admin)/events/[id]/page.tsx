@@ -1,21 +1,17 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import {
   CheckIcon,
   CircleAlertIcon,
   ClockIcon,
-  ExternalLinkIcon,
   Link2Icon,
   Link2OffIcon,
   TriangleAlertIcon,
-  XIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  addManualAttendee,
   deleteEvent,
   markEventDone,
-  removeAttendance,
   sendMessageAction,
   updateSession,
 } from "@/app/actions";
@@ -57,10 +53,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { getDb } from "@/db/client";
 import {
-  attendances,
   events,
   lineGroups,
-  members,
   scheduledMessages,
   sessions,
   type LineGroup,
@@ -74,7 +68,6 @@ export const dynamic = "force-dynamic";
 
 const STATUS_LABELS = {
   draft: { text: "準備中", variant: "secondary" },
-  announced: { text: "アナウンス済み", variant: "default" },
   done: { text: "完了", variant: "outline" },
 } as const;
 
@@ -107,20 +100,6 @@ export default async function EventDetailPage({
       .where(eq(lineGroups.active, true))
       .orderBy(asc(lineGroups.joinedAt)),
   ]);
-  const attendanceRows =
-    sessionRows.length > 0
-      ? await db
-          .select({ attendance: attendances, member: members })
-          .from(attendances)
-          .innerJoin(members, eq(attendances.memberId, members.id))
-          .where(
-            inArray(
-              attendances.sessionId,
-              sessionRows.map((s) => s.id),
-            ),
-          )
-          .orderBy(asc(attendances.respondedAt))
-      : [];
 
   const mainGroup = groupRows.find((g) => g.kind === "main");
   const bindableGroups = groupRows.filter((g) => g.kind !== "main");
@@ -131,22 +110,11 @@ export default async function EventDetailPage({
   return (
     <div className="flex flex-col gap-8">
       <div className="flex items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h1 className="min-w-0 text-xl font-semibold break-words">
-              {event.title}
-            </h1>
-            <Badge variant={status.variant}>{status.text}</Badge>
-          </div>
-          <a
-            href={`/p/${event.publicToken}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-3 hover:text-foreground"
-          >
-            参加状況ページ(アナウンスの「参加状況を確認」で開くもの)
-            <ExternalLinkIcon className="size-3" />
-          </a>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="min-w-0 text-xl font-semibold break-words">
+            {event.title}
+          </h1>
+          <Badge variant={status.variant}>{status.text}</Badge>
         </div>
         <div className="flex shrink-0 gap-2">
           {event.status !== "done" && (
@@ -178,7 +146,7 @@ export default async function EventDetailPage({
           <TriangleAlertIcon className="text-warning" />
           <AlertTitle>メイングループが未設定です</AlertTitle>
           <AlertDescription>
-            アナウンスとグループ案内を送るには、ボットをメインのLINEグループに招待して、
+            グループ案内を送るには、ボットをメインのLINEグループに招待して、
             <Link href="/groups">グループ画面</Link>
             で「メイン」に設定してください。
           </AlertDescription>
@@ -229,16 +197,13 @@ export default async function EventDetailPage({
       </Card>
 
       <section className="flex flex-col gap-4">
-        <h2 className="font-semibold">日程ごとの参加者・設定</h2>
+        <h2 className="font-semibold">日程ごとの設定</h2>
         <div className="grid gap-6 lg:grid-cols-2">
           {sessionRows.map((session) => (
             <SessionCard
               key={session.id}
               session={session}
               eventId={event.id}
-              attendanceRows={attendanceRows.filter(
-                (r) => r.attendance.sessionId === session.id,
-              )}
               bindableGroups={bindableGroups}
               messageRows={smRows.filter((r) => r.sessionId === session.id)}
             />
@@ -404,26 +369,15 @@ function ScheduledAtField({
 function SessionCard({
   session,
   eventId,
-  attendanceRows,
   bindableGroups,
   messageRows,
 }: {
   session: Session;
   eventId: string;
-  attendanceRows: {
-    attendance: typeof attendances.$inferSelect;
-    member: typeof members.$inferSelect;
-  }[];
   bindableGroups: LineGroup[];
   /** この日程に紐づく scheduled_messages(送信日時フィールドの現在値・編集可否に使う) */
   messageRows: ScheduledMessage[];
 }) {
-  const attending = attendanceRows.filter(
-    (r) => r.attendance.status === "attending",
-  );
-  const cancelled = attendanceRows.filter(
-    (r) => r.attendance.status === "cancelled",
-  );
   const boundGroup = bindableGroups.find(
     (g) => g.lineGroupId === session.lineGroupId,
   );
@@ -443,69 +397,7 @@ function SessionCard({
         <CardTitle>{formatJstDateTimeLabel(session.startAt)}</CardTitle>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-3">
-        <h4 className="text-sm font-medium">参加者({attending.length}人)</h4>
-        {attending.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            まだ参加者がいません(アナウンスのボタンで自動集計されます)
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {attending.map(({ attendance, member }) => (
-              <li
-                key={attendance.id}
-                className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-3 py-1.5 text-sm"
-              >
-                <span className="inline-flex min-w-0 items-center gap-2 break-words">
-                  {member.displayName}
-                  {attendance.source === "manual" && (
-                    <Badge variant="secondary">手動</Badge>
-                  )}
-                </span>
-                <ToastForm action={removeAttendance} className="shrink-0">
-                  <input
-                    type="hidden"
-                    name="attendanceId"
-                    value={attendance.id}
-                  />
-                  <input type="hidden" name="eventId" value={eventId} />
-                  <ConfirmButton
-                    confirmMessage={`${member.displayName} さんを参加者から外しますか?`}
-                    actionLabel="外す"
-                    variant="ghost"
-                    size="icon-xs"
-                    className="text-muted-foreground hover:text-destructive"
-                    aria-label="参加者から外す"
-                  >
-                    <XIcon />
-                  </ConfirmButton>
-                </ToastForm>
-              </li>
-            ))}
-          </ul>
-        )}
-        {cancelled.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            取消: {cancelled.map((r) => r.member.displayName).join("、")}
-          </p>
-        )}
-        <ToastForm action={addManualAttendee} className="flex gap-2 pt-1">
-          <input type="hidden" name="sessionId" value={session.id} />
-          <input type="hidden" name="eventId" value={eventId} />
-          <Input
-            type="text"
-            name="name"
-            required
-            autoComplete="off"
-            aria-label="手動追加する参加者名"
-            placeholder="名前を入力して手動追加…"
-            className="flex-1"
-          />
-          <SubmitButton variant="outline">追加</SubmitButton>
-        </ToastForm>
-      </CardContent>
-
-      <CardContent className="border-t pt-(--card-spacing)">
+      <CardContent>
         <ToastForm action={updateSession}>
           <input type="hidden" name="sessionId" value={session.id} />
           <input type="hidden" name="eventId" value={eventId} />

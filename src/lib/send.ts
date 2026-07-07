@@ -1,25 +1,18 @@
 import type { messagingApi } from "@line/bot-sdk";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { MessageKind } from "@/contracts/messages";
 import type { Db } from "@/db/client";
 import {
-  events,
   lineGroups,
   scheduledMessages,
   sessions,
   type ScheduledMessage,
   type Session,
 } from "@/db/schema";
-import { getAppBaseUrl } from "@/lib/env";
-import {
-  formatJstDateLabel,
-  formatJstDateTimeLabel,
-  formatJstTime,
-} from "@/lib/jst";
+import { formatJstDateLabel, formatJstTime } from "@/lib/jst";
 import { pushMessages } from "@/lib/line/client";
 import { getSetting, SETTING_KEYS } from "@/lib/settings";
 import {
-  buildAnnounceMessages,
   buildDayBeforeMessages,
   buildDayOfMessages,
   buildGroupInviteMessages,
@@ -82,13 +75,6 @@ export async function sendScheduledMessage(
       .update(scheduledMessages)
       .set({ status: "sent", sentAt: new Date(), error: null })
       .where(eq(scheduledMessages.id, id));
-
-    if (row.kind === "announce") {
-      await db
-        .update(events)
-        .set({ status: "announced" })
-        .where(and(eq(events.id, row.eventId), eq(events.status, "draft")));
-    }
     return { id, kind: row.kind, ok: true };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -111,34 +97,6 @@ export async function buildScheduledMessage(
   row: ScheduledMessage,
 ): Promise<BuiltMessage> {
   switch (row.kind) {
-    case "announce": {
-      const target = await requireMainGroup(db);
-      const eventRows = await db
-        .select()
-        .from(events)
-        .where(eq(events.id, row.eventId));
-      const event = eventRows[0];
-      if (!event) throw new Error("イベントが見つかりません");
-      const sessionRows = await db
-        .select()
-        .from(sessions)
-        .where(eq(sessions.eventId, row.eventId))
-        .orderBy(asc(sessions.startAt));
-      if (sessionRows.length === 0) {
-        throw new Error("日程が登録されていません");
-      }
-      return {
-        ...target,
-        messages: buildAnnounceMessages({
-          eventTitle: event.title,
-          sessions: sessionRows.map((s) => ({
-            sessionId: s.id,
-            label: formatJstDateTimeLabel(s.startAt),
-          })),
-          statusUrl: `${getAppBaseUrl()}/p/${event.publicToken}`,
-        }),
-      };
-    }
     case "group_invite": {
       const session = await requireSession(db, row);
       const target = await requireMainGroup(db);
@@ -229,7 +187,6 @@ export async function requireMainGroup(db: Db): Promise<GroupTarget> {
 }
 
 async function requireSession(db: Db, row: ScheduledMessage): Promise<Session> {
-  if (!row.sessionId) throw new Error("日程が紐づいていません");
   const rows = await db
     .select()
     .from(sessions)

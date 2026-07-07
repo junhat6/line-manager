@@ -15,8 +15,6 @@ const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../.
 const { values: args } = parseArgs({
   options: {
     type: { type: "string" },
-    action: { type: "string", default: "attend" },
-    "session-id": { type: "string" },
     "group-id": { type: "string", default: "C0000000000000000000000000000000" },
     "user-id": { type: "string", default: "U0000000000000000000000000000000" },
     url: { type: "string" },
@@ -30,8 +28,8 @@ function fail(msg) {
   process.exit(1);
 }
 
-if (!["join", "leave", "postback"].includes(args.type ?? "")) {
-  fail("--type は join | leave | postback のいずれかを指定してください");
+if (!["join", "leave"].includes(args.type ?? "")) {
+  fail("--type は join | leave のいずれかを指定してください");
 }
 const channel = Number.parseInt(args.channel, 10);
 if (!Number.isInteger(channel) || channel < 1) {
@@ -41,12 +39,6 @@ if (!Number.isInteger(channel) || channel < 1) {
 const url =
   args.url ??
   `http://localhost:3000/api/line/webhook${channel >= 2 ? `?channel=${channel}` : ""}`;
-if (args.type === "postback") {
-  if (!args["session-id"]) fail("--type postback には --session-id <UUID> が必要です");
-  if (!["attend", "cancel"].includes(args.action)) {
-    fail("--action は attend | cancel のいずれかを指定してください");
-  }
-}
 
 // チャネル1は基本名、2以降は連番付きの環境変数(src/lib/line/channels.ts と同じ規約)
 const secretKey =
@@ -83,26 +75,11 @@ const base = {
   deliveryContext: { isRedelivery: false },
 };
 
-let event;
-switch (args.type) {
-  case "join":
-    event = { ...base, type: "join", source: { type: "group", groupId: args["group-id"] } };
-    break;
-  case "leave":
-    event = { ...base, type: "leave", source: { type: "group", groupId: args["group-id"] } };
-    break;
-  case "postback":
-    event = {
-      ...base,
-      type: "postback",
-      source: { type: "group", groupId: args["group-id"], userId: args["user-id"] },
-      replyToken: "0".repeat(32),
-      postback: {
-        data: JSON.stringify({ action: args.action, sessionId: args["session-id"] }),
-      },
-    };
-    break;
-}
+const event = {
+  ...base,
+  type: args.type,
+  source: { type: "group", groupId: args["group-id"] },
+};
 
 const body = JSON.stringify({ destination: args["user-id"], events: [event] });
 const signature = crypto.createHmac("sha256", secret).update(body).digest("base64");

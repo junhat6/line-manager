@@ -3,23 +3,6 @@
  * テンプレート実装(src/lib/templates.ts)はこの型だけに依存し、DBの形を知らない。
  */
 
-export type AnnounceSessionInput = {
-  sessionId: string;
-  /** 例: "7/18(土) 19:00" */
-  label: string;
-};
-
-export type AnnounceInput = {
-  eventTitle: string;
-  sessions: AnnounceSessionInput[];
-  /**
-   * 参加状況の公開ページURL(/p/[token])。
-   * タップはサイレント(displayTextなし)のため、押した本人が
-   * 「登録されたか」を確認できる唯一の導線としてFlexに載せる。
-   */
-  statusUrl: string;
-};
-
 export type GroupInviteInput = {
   /** 例: "7/18(土)" */
   dateLabel: string;

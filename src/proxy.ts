@@ -18,8 +18,8 @@ export function proxy(req: NextRequest): Response | undefined {
   const { pathname, search } = req.nextUrl;
   const isRead = req.method === "GET" || req.method === "HEAD";
 
-  // 参加者向けの参加状況ページ(/p/[token])はGET閲覧のみ認証免除 —
-  // 推測不能なトークンURL自体が認可を兼ねる(LINEのボタンから誰でも開けるようにする)。
+  // 限定公開ページ(/p/docs/[token] の運営マニュアル)はGET閲覧のみ認証免除 —
+  // 推測不能なトークンURL自体が認可を兼ねる(リンクを知っていれば誰でも開ける)。
   // matcherで丸ごと除外しない: Server ActionのPOSTはactionIdでグローバルに
   // ディスパッチされるため、除外パスへの未認証POSTが管理系アクションの実行口になる。
   if (isRead && pathname.startsWith("/p/")) {

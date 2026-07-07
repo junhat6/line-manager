@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -14,10 +13,8 @@ import {
 } from "@/contracts/forms";
 import { getDb, type Db } from "@/db/client";
 import {
-  attendances,
   events,
   lineGroups,
-  members,
   schedulePolls,
   scheduledMessages,
   sessions,
@@ -112,9 +109,7 @@ async function createEventWithSessions(
 ): Promise<{ id: string }> {
   const [event] = await db.insert(events).values({ title }).returning();
 
-  const smValues: (typeof scheduledMessages.$inferInsert)[] = [
-    { eventId: event.id, sessionId: null, kind: "announce", scheduledAt: null },
-  ];
+  const smValues: (typeof scheduledMessages.$inferInsert)[] = [];
   for (const startAt of startAts) {
     const [session] = await db
       .insert(sessions)
@@ -265,67 +260,6 @@ export async function sendMessageAction(
       return { ok: false, message: result.error ?? "送信に失敗しました" };
     }
     return { ok: true, message: "送信しました" };
-  } catch (e) {
-    return failure(e);
-  }
-}
-
-export async function addManualAttendee(
-  formData: FormData,
-): Promise<ActionResult> {
-  try {
-    const sessionId = z.uuid().parse(text(formData, "sessionId"));
-    const eventId = z.uuid().parse(text(formData, "eventId"));
-    const name = z
-      .string()
-      .trim()
-      .min(1, "名前を入力してください")
-      .parse(text(formData, "name"));
-
-    const db = getDb();
-    // 口頭・チャット外で参加表明した人向け。LINEユーザーと紐づかないので専用IDを振る
-    const [member] = await db
-      .insert(members)
-      .values({ lineUserId: `manual:${randomUUID()}`, displayName: name })
-      .returning();
-    await db
-      .insert(attendances)
-      .values({ sessionId, memberId: member.id, source: "manual" });
-
-    revalidatePath(`/events/${eventId}`);
-    return { ok: true, message: `${name} さんを追加しました` };
-  } catch (e) {
-    return failure(e);
-  }
-}
-
-export async function removeAttendance(
-  formData: FormData,
-): Promise<ActionResult> {
-  try {
-    const attendanceId = z.uuid().parse(text(formData, "attendanceId"));
-    const eventId = z.uuid().parse(text(formData, "eventId"));
-
-    const db = getDb();
-    const removed = await db
-      .delete(attendances)
-      .where(eq(attendances.id, attendanceId))
-      .returning({ memberId: attendances.memberId });
-
-    // 手動追加のメンバーは参加記録以外に存在意義がないので一緒に消す
-    const memberId = removed[0]?.memberId;
-    if (memberId) {
-      const rows = await db
-        .select({ lineUserId: members.lineUserId })
-        .from(members)
-        .where(eq(members.id, memberId));
-      if (rows[0]?.lineUserId.startsWith("manual:")) {
-        await db.delete(members).where(eq(members.id, memberId));
-      }
-    }
-
-    revalidatePath(`/events/${eventId}`);
-    return { ok: true, message: "参加者から外しました" };
   } catch (e) {
     return failure(e);
   }

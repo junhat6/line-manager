@@ -16,7 +16,7 @@ import { getAppBaseUrl } from "@/lib/env";
 /**
  * 運営マニュアルの限定公開ページ。
  * /p/ 配下のGET/HEADは src/proxy.ts で管理画面ログインが免除され、
- * 推測不能なURL(DOCS_TOKEN)自体が認可を兼ねる — 参加状況ページ(/p/[token])と同じ方式。
+ * 推測不能なURL(DOCS_TOKEN)自体が認可を兼ねる。
  * 管理画面ログインのID/パスワードを表示するページなので:
  * - 原稿(docs/manual.md)には秘密を書かず、envからリクエスト時に描画する
  *   (リポジトリに秘密が残らず、パスワード変更も自動で反映される)

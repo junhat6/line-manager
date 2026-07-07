@@ -5,25 +5,10 @@ import {
   pgTable,
   text,
   timestamp,
-  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
-export const eventStatusEnum = pgEnum("event_status", [
-  "draft",
-  "announced",
-  "done",
-]);
-
-export const attendanceStatusEnum = pgEnum("attendance_status", [
-  "attending",
-  "cancelled",
-]);
-
-export const attendanceSourceEnum = pgEnum("attendance_source", [
-  "postback",
-  "manual",
-]);
+export const eventStatusEnum = pgEnum("event_status", ["draft", "done"]);
 
 export const groupKindEnum = pgEnum("group_kind", [
   "main",
@@ -32,7 +17,6 @@ export const groupKindEnum = pgEnum("group_kind", [
 ]);
 
 export const messageKindEnum = pgEnum("message_kind", [
-  "announce",
   "group_invite",
   "slide_request",
   "day_before",
@@ -53,12 +37,6 @@ export const events = pgTable("events", {
   id: uuid("id").primaryKey().defaultRandom(),
   title: text("title").notNull(),
   status: eventStatusEnum("status").notNull().default("draft"),
-  /**
-   * 参加状況の公開ページ(/p/[token])用トークン。
-   * id とは別に持つ — id は管理画面URLに露出しており、公開を止めたくなったら
-   * このトークンだけ無効化(再生成)できる余地を残すため。
-   */
-  publicToken: uuid("public_token").notNull().defaultRandom().unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -82,39 +60,6 @@ export const sessions = pgTable("sessions", {
     .notNull()
     .defaultNow(),
 });
-
-/** LINEユーザー。postback受信時に自動登録。手動追加は lineUserId が "manual:" 始まり */
-export const members = pgTable("members", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  lineUserId: text("line_user_id").notNull().unique(),
-  displayName: text("display_name").notNull(),
-  pictureUrl: text("picture_url"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
-
-/** 日程ごとの参加表明。(sessionId, memberId) で一意 = ボタン連打しても1レコード */
-export const attendances = pgTable(
-  "attendances",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    sessionId: uuid("session_id")
-      .notNull()
-      .references(() => sessions.id, { onDelete: "cascade" }),
-    memberId: uuid("member_id")
-      .notNull()
-      .references(() => members.id, { onDelete: "cascade" }),
-    status: attendanceStatusEnum("status").notNull().default("attending"),
-    source: attendanceSourceEnum("source").notNull(),
-    respondedAt: timestamp("responded_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (t) => [
-    uniqueIndex("attendances_session_member_uq").on(t.sessionId, t.memberId),
-  ],
-);
 
 /** ボットが参加しているLINEグループ。joinイベントで自動登録 */
 export const lineGroups = pgTable("line_groups", {
@@ -143,10 +88,9 @@ export const scheduledMessages = pgTable("scheduled_messages", {
   eventId: uuid("event_id")
     .notNull()
     .references(() => events.id, { onDelete: "cascade" }),
-  /** announce はイベント全体宛のため null */
-  sessionId: uuid("session_id").references(() => sessions.id, {
-    onDelete: "cascade",
-  }),
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => sessions.id, { onDelete: "cascade" }),
   kind: messageKindEnum("kind").notNull(),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   status: messageStatusEnum("status").notNull().default("pending"),
@@ -198,8 +142,6 @@ export const settings = pgTable("settings", {
 
 export type Event = typeof events.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
-export type Member = typeof members.$inferSelect;
-export type Attendance = typeof attendances.$inferSelect;
 export type LineGroup = typeof lineGroups.$inferSelect;
 export type ScheduledMessage = typeof scheduledMessages.$inferSelect;
 export type SchedulePoll = typeof schedulePolls.$inferSelect;
