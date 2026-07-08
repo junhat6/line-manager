@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildMonthCandidates,
+  buildMonthCandidateDates,
   extractEventHash,
   nextMonthStart,
   parseChouseisanCsv,
   parseCsvRows,
   rankCandidates,
+  tallyChouseisanCsvByLabel,
+  toPollCandidates,
 } from "./chouseisan";
 import { jstToUtc } from "./jst";
 
@@ -21,18 +23,37 @@ describe("nextMonthStart", () => {
   });
 });
 
-describe("buildMonthCandidates", () => {
-  it("対象月の全日をラベル化する(2026年8月=31日)", () => {
-    const labels = buildMonthCandidates(jstToUtc(2026, 8, 1));
-    expect(labels).toHaveLength(31);
-    expect(labels[0]).toBe("8/1(土)");
-    expect(labels[30]).toBe("8/31(月)");
+describe("buildMonthCandidateDates", () => {
+  it("対象月の全日を共通時刻で並べる(2026年8月=31日)", () => {
+    const dates = buildMonthCandidateDates(jstToUtc(2026, 8, 1), 20, 0);
+    expect(dates).toHaveLength(31);
+    expect(dates[0]).toEqual(jstToUtc(2026, 8, 1, 20, 0));
+    expect(dates[30]).toEqual(jstToUtc(2026, 8, 31, 20, 0));
   });
 
   it("うるう年でない2月は28日まで", () => {
-    const labels = buildMonthCandidates(jstToUtc(2026, 2, 1));
-    expect(labels).toHaveLength(28);
-    expect(labels[27]).toBe("2/28(土)");
+    const dates = buildMonthCandidateDates(jstToUtc(2026, 2, 1), 20, 30);
+    expect(dates).toHaveLength(28);
+    expect(dates[27]).toEqual(jstToUtc(2026, 2, 28, 20, 30));
+  });
+});
+
+describe("toPollCandidates", () => {
+  it("日時をラベル化し、昇順に並べる", () => {
+    const candidates = toPollCandidates([
+      jstToUtc(2026, 8, 2, 13, 30),
+      jstToUtc(2026, 8, 1, 20, 0),
+    ]);
+    expect(candidates).toEqual([
+      {
+        label: "8/1(土) 20:00",
+        startAt: jstToUtc(2026, 8, 1, 20, 0).toISOString(),
+      },
+      {
+        label: "8/2(日) 13:30",
+        startAt: jstToUtc(2026, 8, 2, 13, 30).toISOString(),
+      },
+    ]);
   });
 });
 
@@ -83,6 +104,57 @@ describe("parseChouseisanCsv", () => {
     const results = parseChouseisanCsv(csv, targetMonth);
     expect(results).toHaveLength(1);
     expect(results[0].label).toBe("8/1(土)");
+  });
+});
+
+describe("tallyChouseisanCsvByLabel", () => {
+  const candidates = toPollCandidates([
+    jstToUtc(2026, 8, 1, 20, 0),
+    jstToUtc(2026, 8, 8, 13, 30),
+    jstToUtc(2026, 9, 5, 20, 0),
+  ]);
+  const csv = [
+    "8月交流会 日程調整",
+    "○△×で入力してください",
+    "日程,山田,田中,佐藤",
+    "8/1(土) 20:00,○,×,△",
+    "8/8(土) 13:30,○,○,×",
+    "9/5(土) 20:00,△,,×",
+    "コメント,よろしく!,,",
+  ].join("\n");
+
+  it("保存した候補ラベルと一致する行だけを集計し、開始日時を復元する", () => {
+    const results = tallyChouseisanCsvByLabel(csv, candidates);
+    expect(results).toHaveLength(3);
+    expect(results[0]).toMatchObject({
+      label: "8/1(土) 20:00",
+      attend: 1,
+      maybe: 1,
+      absent: 1,
+      score: 1.5,
+    });
+    expect(results[0].date).toEqual(jstToUtc(2026, 8, 1, 20, 0));
+    // 月をまたぐ候補も候補一覧に基づいて正しい年月に復元される
+    expect(results[2].date).toEqual(jstToUtc(2026, 9, 5, 20, 0));
+  });
+
+  it("候補に無いラベルの行(ヘッダ・コメント)は無視する", () => {
+    const results = tallyChouseisanCsvByLabel(csv, candidates);
+    expect(results.map((r) => r.label)).toEqual([
+      "8/1(土) 20:00",
+      "8/8(土) 13:30",
+      "9/5(土) 20:00",
+    ]);
+  });
+
+  it("同じラベルが複数回現れたら最初の行だけ採用する", () => {
+    const dup = ["8/1(土) 20:00,○", "8/1(土) 20:00,×"].join("\n");
+    const results = tallyChouseisanCsvByLabel(
+      dup,
+      toPollCandidates([jstToUtc(2026, 8, 1, 20, 0)]),
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0].attend).toBe(1);
   });
 });
 

@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -106,6 +107,17 @@ export const scheduledMessages = pgTable("scheduled_messages", {
 export const pollStatusEnum = pgEnum("poll_status", ["open", "imported"]);
 
 /**
+ * 日程調整の候補1件。調整さんに登録したラベルと、その候補の開催開始日時のペア。
+ * ラベルは取込時にCSVの行と突き合わせるキーなので、登録後に変えてはいけない。
+ */
+export type PollCandidate = {
+  /** 調整さんの候補欄に登録したラベル。例: "8/1(土) 20:00" */
+  label: string;
+  /** 開催開始日時(ISO 8601)。取込時にセッションのstartAtになる */
+  startAt: string;
+};
+
+/**
  * 調整さん(chouseisan.com)の日程調整。
  * 管理画面の「日程調整を開始」で調整さんイベントを作成してURLを記録し、
  * 「結果を取り込む」でCSVを集計して上位2日程のイベント(events)に変換する。
@@ -120,8 +132,18 @@ export const schedulePolls = pgTable("schedule_polls", {
    * null はカラム追加前の既存行で、既定文面にフォールバックする。
    */
   message: text("message"),
-  /** 候補日の対象月(その月の1日 JST)。候補ラベル「7/18(土)」→日付の復元に使う */
+  /**
+   * 候補日の対象月(その月の1日 JST)。管理画面の「対象: ◯月」表示と、
+   * candidates が null の既存行で候補ラベル「7/18(土)」→日付を復元するのに使う。
+   * 候補が月をまたぐ場合は最初(最早)の候補日の月。
+   */
   targetMonth: timestamp("target_month", { withTimezone: true }).notNull(),
+  /**
+   * 調整さんに登録した候補の一覧。取込時はラベルでCSV行と突き合わせ、
+   * startAt がそのままイベント日程になる。
+   * null はカラム追加前の既存行で、targetMonth + M/Dパース + 19:00 の旧ロジックで復元する。
+   */
+  candidates: jsonb("candidates").$type<PollCandidate[]>(),
   status: pollStatusEnum("status").notNull().default("open"),
   /** URLをメイングループに投稿した時刻(nullなら未投稿=投稿失敗の可能性) */
   postedAt: timestamp("posted_at", { withTimezone: true }),

@@ -2,7 +2,7 @@
 // ライブラリを入れずにepoch演算+UTCゲッターで完結させる。
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const WEEKDAYS_JA = ["日", "月", "火", "水", "木", "金", "土"] as const;
+export const WEEKDAYS_JA = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
 export type JstParts = {
   year: number;

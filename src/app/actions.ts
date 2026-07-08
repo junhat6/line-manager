@@ -7,6 +7,7 @@ import { z } from "zod";
 import {
   createEventSchema,
   saveSettingsSchema,
+  startCustomSchedulePollSchema,
   startSchedulePollSchema,
   updateSessionSchema,
   type ActionResult,
@@ -21,12 +22,14 @@ import {
   type SchedulePoll,
 } from "@/db/schema";
 import {
-  buildMonthCandidates,
+  buildMonthCandidateDates,
   createChouseisanEvent,
   fetchChouseisanCsv,
   nextMonthStart,
   parseChouseisanCsv,
   rankCandidates,
+  tallyChouseisanCsvByLabel,
+  toPollCandidates,
 } from "@/lib/chouseisan";
 import {
   dayBeforeAt15,
@@ -313,13 +316,66 @@ export async function setGroupKind(formData: FormData): Promise<ActionResult> {
   }
 }
 
-/** 日程調整の開催時刻のデフォルト(イベント作成フォームの初期値と同じ。取込後に日程カードで変更可能) */
+/**
+ * candidates未保存の既存行の取込で使う開催時刻
+ * (現在の作成フローは候補ごとに開始時刻を持つため、ここは使わない)
+ */
 const DEFAULT_SESSION_HOUR = 19;
 
+/** "HH:MM" を [hour, minute] に分解する(zodでhalfHourTime検証済みの値を渡す) */
+function splitTime(time: string): [number, number] {
+  const [hour, minute] = time.split(":").map(Number);
+  return [hour, minute];
+}
+
 /**
- * 来月分の日程調整を開始する:
- * 調整さんに来月全日程を候補にしたイベントを作成し、URLをメイングループに投稿する。
+ * 日程調整の作成共通処理(かんたん/カスタムの合流点):
+ * 調整さんにイベントを作成して行を保存し、URLをメイングループに投稿する。
+ * candidateDates は各候補の開催開始日時。タイトルと対象月は最初(最早)の候補日の月から決める。
  * 投稿本文はフォームで編集でき、再投稿でも同じ本文を使うため行に保存する。
+ */
+async function createPollAndPost(
+  message: string,
+  candidateDates: Date[],
+): Promise<ActionResult> {
+  const db = getDb();
+  const candidates = toPollCandidates(candidateDates);
+  const first = toJstParts(new Date(candidates[0].startAt));
+  const targetMonth = jstToUtc(first.year, first.month, 1);
+  const title = `${first.month}月交流会 日程調整`;
+
+  const { url } = await createChouseisanEvent({
+    title,
+    comment:
+      "参加できる日時に◯、調整すれば参加できる日時に△、難しい日時に×をお願いします!",
+    candidates: candidates.map((c) => c.label),
+  });
+
+  const [poll] = await db
+    .insert(schedulePolls)
+    .values({ title, chouseisanUrl: url, targetMonth, message, candidates })
+    .returning();
+
+  // URL投稿に失敗しても調整さんイベント自体は作成済みなので、行は残して
+  // 「再投稿」ボタンでリカバリできるようにする(投稿済みかは postedAt で見える)
+  try {
+    await postPollUrlToMainGroup(db, poll);
+  } catch (e) {
+    console.error("schedule poll URL post failed", poll.id, e);
+    revalidatePath("/polls");
+    return {
+      ok: false,
+      message:
+        "日程調整は作成しましたが、グループへのURL投稿に失敗しました。「グループに投稿する」から再試行してください",
+    };
+  }
+
+  revalidatePath("/polls");
+  return { ok: true, message: "日程調整を作成し、グループに投稿しました" };
+}
+
+/**
+ * かんたん作成: 来月の全日程(共通の開始時刻)を候補にした日程調整を開始する。
  */
 export async function startSchedulePoll(
   formData: FormData,
@@ -327,43 +383,47 @@ export async function startSchedulePoll(
   try {
     const input = startSchedulePollSchema.parse({
       message: text(formData, "message"),
+      time: text(formData, "time"),
     });
 
-    const db = getDb();
-    const targetMonth = nextMonthStart(new Date());
-    const month = toJstParts(targetMonth).month;
-    const title = `${month}月交流会 日程調整`;
-
-    const { url } = await createChouseisanEvent({
-      title,
-      comment:
-        "参加できる日に◯、調整すれば参加できる日に△、難しい日に×をお願いします!",
-      candidates: buildMonthCandidates(targetMonth),
-    });
-
-    const [poll] = await db
-      .insert(schedulePolls)
-      .values({ title, chouseisanUrl: url, targetMonth, message: input.message })
-      .returning();
-
-    // URL投稿に失敗しても調整さんイベント自体は作成済みなので、行は残して
-    // 「再投稿」ボタンでリカバリできるようにする(投稿済みかは postedAt で見える)
-    try {
-      await postPollUrlToMainGroup(db, poll);
-    } catch (e) {
-      console.error("schedule poll URL post failed", poll.id, e);
-      revalidatePath("/polls");
-      return {
-        ok: false,
-        message:
-          "日程調整は作成しましたが、グループへのURL投稿に失敗しました。「グループに投稿する」から再試行してください",
-      };
-    }
-
-    revalidatePath("/polls");
-    return { ok: true, message: "日程調整を作成し、グループに投稿しました" };
+    const [hour, minute] = splitTime(input.time);
+    return await createPollAndPost(
+      input.message,
+      buildMonthCandidateDates(nextMonthStart(new Date()), hour, minute),
+    );
   } catch (e) {
     return failure(e);
+  }
+}
+
+/**
+ * カスタム作成: カレンダーで選んだ日付と開始時刻の組み合わせを候補にした日程調整を開始する。
+ * 候補はクライアントで組み立てたJSON(hidden input)で受け取る。
+ */
+export async function startCustomSchedulePoll(
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const input = startCustomSchedulePollSchema.parse({
+      message: text(formData, "message"),
+      candidates: parseJsonOrEmptyArray(text(formData, "candidates")),
+    });
+
+    return await createPollAndPost(
+      input.message,
+      input.candidates.map((c) => parseJstFromInput(`${c.date}T${c.time}`)),
+    );
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/** 壊れたJSONは空配列に落とし、zodの「候補日を選んでください」エラーに合流させる */
+function parseJsonOrEmptyArray(json: string): unknown {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return [];
   }
 }
 
@@ -429,7 +489,13 @@ export async function importSchedulePoll(
       eventId = poll.importedEventId;
     } else {
       const csv = await fetchChouseisanCsv(poll.chouseisanUrl);
-      const ranked = rankCandidates(parseChouseisanCsv(csv, poll.targetMonth));
+      // candidates保存済みの行はラベル完全一致で照合し、開始時刻も候補が持つ。
+      // 未保存の既存行は旧ロジック(対象月のM/D復元 + 既定時刻)で取り込む
+      const ranked = rankCandidates(
+        poll.candidates
+          ? tallyChouseisanCsvByLabel(csv, poll.candidates)
+          : parseChouseisanCsv(csv, poll.targetMonth),
+      );
       if (ranked.length === 0) {
         return {
           ok: false,
@@ -448,6 +514,7 @@ export async function importSchedulePoll(
       const startAts = ranked
         .slice(0, 2)
         .map((c) => {
+          if (poll.candidates) return c.date;
           const p = toJstParts(c.date);
           return jstToUtc(p.year, p.month, p.day, DEFAULT_SESSION_HOUR, 0);
         })

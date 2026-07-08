@@ -12,6 +12,7 @@ import {
   startSchedulePoll,
 } from "@/app/actions";
 import { ConfirmButton } from "@/components/ConfirmButton";
+import { CustomPollForm } from "@/components/CustomPollForm";
 import { ToastForm } from "@/components/ToastForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,11 +37,23 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getDb } from "@/db/client";
 import { schedulePolls } from "@/db/schema";
 import { nextMonthStart } from "@/lib/chouseisan";
 import { formatJstDateTimeLabel, toJstParts } from "@/lib/jst";
+import {
+  DEFAULT_POLL_TIME,
+  HALF_HOUR_TIME_ITEMS,
+} from "@/lib/poll-time-options";
 import { defaultPollMessageBody } from "@/lib/templates";
 
 export const dynamic = "force-dynamic";
@@ -53,26 +66,52 @@ export default async function PollsPage() {
     .orderBy(desc(schedulePolls.createdAt));
 
   // フォームのプリフィル用。dynamic="force-dynamic" なのでリクエスト時点の来月が入る
-  const nextMonth = toJstParts(nextMonthStart(new Date())).month;
+  const nextMonthParts = toJstParts(nextMonthStart(new Date()));
+  const nextMonth = nextMonthParts.month;
 
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">日程調整</h1>
       <p className="max-w-prose text-sm text-pretty text-muted-foreground">
-        「開始」で調整さん(chouseisan.com)に来月の全日程を候補にした出欠表を作り、URLをメイングループへ自動投稿します。
-        回答が集まったら「結果を取り込む」で、◯=1点・△=0.5点の集計上位2日程のイベントが自動作成されます(同点は早い日付を優先)。
+        調整さん(chouseisan.com)に日時候補の出欠表を作り、URLをメイングループへ自動投稿します。
+        かんたん作成は来月の全日程、カスタム作成はカレンダーで選んだ日付と時刻が候補になります。
+        回答が集まったら「結果を取り込む」で、◯=1点・△=0.5点の集計上位2日程のイベントが自動作成されます(候補の時刻がそのまま開催時刻に。同点は早い日付を優先)。
       </p>
 
       <Card>
         <CardHeader className="border-b">
-          <CardTitle>来月({nextMonth}月)の日程調整を開始</CardTitle>
+          <CardTitle>来月({nextMonth}月)の日程調整をかんたん作成</CardTitle>
           <CardDescription>
-            下のメッセージと調整さんのURLがメイングループに投稿されます。文面は自由に編集できます。
+            来月の全日程を候補にします。下のメッセージと調整さんのURLがメイングループに投稿されます。文面は自由に編集できます。
           </CardDescription>
         </CardHeader>
         <CardContent>
           <ToastForm action={startSchedulePoll}>
             <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel>開始時刻(全候補共通)</FieldLabel>
+                <Select
+                  name="time"
+                  defaultValue={DEFAULT_POLL_TIME}
+                  items={HALF_HOUR_TIME_ITEMS}
+                >
+                  <SelectTrigger size="sm" aria-label="開始時刻">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {HALF_HOUR_TIME_ITEMS.map((item) => (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <FieldDescription className="text-xs">
+                  候補は「8/1(土) 20:00」のように日付+この時刻で作られ、取込後の開催時刻になります
+                </FieldDescription>
+              </Field>
               <Field>
                 <FieldLabel htmlFor="poll-message">
                   グループに投稿するメッセージ
@@ -101,6 +140,22 @@ export default async function PollsPage() {
               </ConfirmButton>
             </FieldGroup>
           </ToastForm>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="border-b">
+          <CardTitle>カスタム日程調整を作成</CardTitle>
+          <CardDescription>
+            候補にする日付と開始時刻を自由に選んで作成します。月をまたぐ候補も選べます。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CustomPollForm
+            defaultMessage={defaultPollMessageBody(nextMonth)}
+            initialYear={nextMonthParts.year}
+            initialMonth={nextMonth}
+          />
         </CardContent>
       </Card>
 

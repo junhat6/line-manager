@@ -47,13 +47,44 @@ export const updateSessionSchema = z.object({
   surveyAt: z.date().nullable(),
 });
 
+/** メイングループに投稿する本文。調整さんのURLは送信時に末尾へ付加される */
+const pollMessage = z
+  .string()
+  .trim()
+  .min(1, "グループに投稿するメッセージを入力してください")
+  .max(4000, "メッセージが長すぎます(4000文字以内)");
+
+/** 開始時刻 "HH:MM"。運用上30分刻みしか使わないため 00分/30分 のみ許可 */
+const halfHourTime = z
+  .string()
+  .regex(
+    /^([01]\d|2[0-3]):(00|30)$/,
+    "時刻は30分刻み(例 20:00、20:30)で指定してください",
+  );
+
+/** かんたん作成: 来月の全日程を候補にする。時刻は全候補共通 */
 export const startSchedulePollSchema = z.object({
-  /** メイングループに投稿する本文。調整さんのURLは送信時に末尾へ付加される */
-  message: z
-    .string()
-    .trim()
-    .min(1, "グループに投稿するメッセージを入力してください")
-    .max(4000, "メッセージが長すぎます(4000文字以内)"),
+  message: pollMessage,
+  time: halfHourTime,
+});
+
+/** カスタム作成: カレンダーで選んだ日付ごとに開始時刻を持つ */
+export const startCustomSchedulePollSchema = z.object({
+  message: pollMessage,
+  candidates: z
+    .array(
+      z.object({
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, "候補日の形式が不正です"),
+        time: halfHourTime,
+      }),
+    )
+    .min(1, "候補日をカレンダーから1つ以上選んでください")
+    .max(62, "候補日が多すぎます(62日以内にしてください)")
+    .refine((cs) => new Set(cs.map((c) => c.date)).size === cs.length, {
+      message: "同じ候補日が重複しています",
+    }),
 });
 
 export const saveSettingsSchema = z.object({

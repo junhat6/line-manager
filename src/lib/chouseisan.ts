@@ -12,7 +12,8 @@
  * - 結果取得: /schedule/List/createCsv?h=<hash> がCSVを返す(現在はUTF-8。
  *   旧仕様のShift_JISにもフォールバックで対応)
  */
-import { formatJstDateLabel, jstToUtc, toJstParts } from "@/lib/jst";
+import type { PollCandidate } from "@/db/schema";
+import { formatJstDateTimeLabel, jstToUtc, toJstParts } from "@/lib/jst";
 
 const BASE_URL = "https://chouseisan.com";
 // 素のfetchのUAを弾かれても切り分けられるよう、ブラウザ相当のUAを名乗る
@@ -29,21 +30,42 @@ export function nextMonthStart(now: Date): Date {
   return jstToUtc(year, month, 1);
 }
 
-/** 対象月の全日程の候補ラベル(調整さんの候補欄に入れる)。例: ["7/1(水)", ..., "7/31(金)"] */
-export function buildMonthCandidates(targetMonth: Date): string[] {
+/**
+ * 対象月の全日程の開始日時(かんたん作成用)。時刻は全日共通。
+ * 例: hour=20 → [7/1 20:00, ..., 7/31 20:00](JST)
+ */
+export function buildMonthCandidateDates(
+  targetMonth: Date,
+  hour: number,
+  minute: number,
+): Date[] {
   const p = toJstParts(targetMonth);
-  const labels: string[] = [];
+  const dates: Date[] = [];
   for (let day = 1; day <= 31; day++) {
-    const date = jstToUtc(p.year, p.month, day);
+    const date = jstToUtc(p.year, p.month, day, hour, minute);
     if (toJstParts(date).month !== p.month) break;
-    labels.push(formatJstDateLabel(date));
+    dates.push(date);
   }
-  return labels;
+  return dates;
+}
+
+/**
+ * 開始日時の一覧を調整さんに登録する候補(ラベル+開始日時)に変換する。
+ * ラベルは「8/1(土) 20:00」形式。取込時のCSV照合キーになるため、
+ * 生成ルールを変えると既存の未取込の日程調整が照合できなくなることに注意。
+ */
+export function toPollCandidates(dates: Date[]): PollCandidate[] {
+  return [...dates]
+    .sort((a, b) => a.getTime() - b.getTime())
+    .map((date) => ({
+      label: formatJstDateTimeLabel(date),
+      startAt: date.toISOString(),
+    }));
 }
 
 export type CandidateResult = {
   label: string;
-  /** その日の0:00 JST */
+  /** 開催開始日時。candidates照合ではstartAt、旧ロジック(月+日復元)ではその日の0:00 JST */
   date: Date;
   attend: number; // ○
   maybe: number; // △
@@ -51,6 +73,52 @@ export type CandidateResult = {
   /** ○=1点 + △=0.5点 (×と未入力は0点) */
   score: number;
 };
+
+/** 候補行の2列目以降(参加者ごとの回答)を集計する */
+function countMarks(row: string[]): {
+  attend: number;
+  maybe: number;
+  absent: number;
+  score: number;
+} {
+  let attend = 0;
+  let maybe = 0;
+  let absent = 0;
+  for (const cell of row.slice(1)) {
+    const mark = cell.trim();
+    if (mark === "○" || mark === "◯") attend++;
+    else if (mark === "△") maybe++;
+    else if (mark === "×" || mark === "✕") absent++;
+    // 未入力・その他は集計対象外
+  }
+  return { attend, maybe, absent, score: attend + maybe * 0.5 };
+}
+
+/**
+ * 調整さんのCSVを、作成時に保存した候補一覧とのラベル完全一致で集計する。
+ * ラベルは登録した文字列がそのままCSVの先頭列に返る前提(照合キー)。
+ * 一致しない行(ヘッダ・コメント行など)は無視し、同じラベルは最初の行だけ採用する。
+ */
+export function tallyChouseisanCsvByLabel(
+  csvText: string,
+  candidates: PollCandidate[],
+): CandidateResult[] {
+  const remaining = new Map(candidates.map((c) => [c.label, c]));
+  const results: CandidateResult[] = [];
+
+  for (const row of parseCsvRows(csvText)) {
+    const label = (row[0] ?? "").trim();
+    const candidate = remaining.get(label);
+    if (!candidate) continue;
+    remaining.delete(label);
+    results.push({
+      label,
+      date: new Date(candidate.startAt),
+      ...countMarks(row),
+    });
+  }
+  return results;
+}
 
 /**
  * 調整さんのCSV(デコード済みテキスト)をパースして候補日ごとの集計を返す。
@@ -74,23 +142,10 @@ export function parseChouseisanCsv(
     const day = Number(m[2]);
     if (month !== target.month) continue;
 
-    let attend = 0;
-    let maybe = 0;
-    let absent = 0;
-    for (const cell of row.slice(1)) {
-      const mark = cell.trim();
-      if (mark === "○" || mark === "◯") attend++;
-      else if (mark === "△") maybe++;
-      else if (mark === "×" || mark === "✕") absent++;
-      // 未入力・その他は集計対象外
-    }
     results.push({
       label,
       date: jstToUtc(target.year, month, day),
-      attend,
-      maybe,
-      absent,
-      score: attend + maybe * 0.5,
+      ...countMarks(row),
     });
   }
   return results;
