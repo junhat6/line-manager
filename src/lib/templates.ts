@@ -3,6 +3,7 @@ import type {
   DayBeforeInput,
   DayOfInput,
   GroupInviteInput,
+  PollReminderInput,
   PollUrlInput,
   SlideRequestInput,
   SurveyInput,
@@ -93,6 +94,20 @@ export function defaultPollMessageBody(month: number): string {
 /** 日程調整のURL投稿。本文は管理画面で編集できるため、URLの付加だけを担う */
 export function buildPollUrlMessages(input: PollUrlInput): Message[] {
   return [{ type: "text", text: `${input.body}\n${input.url}` }];
+}
+
+/** 日程調整の締切当日リマインド。締切を過ぎる前の最後の呼びかけとして送る */
+export function buildPollReminderMessages(input: PollReminderInput): Message[] {
+  return [
+    {
+      type: "text",
+      text: [
+        `⏰【${input.title}】の回答締切は本日${input.deadlineTime}までです!`,
+        "まだの方はお早めにお願いします🙏",
+        input.url,
+      ].join("\n"),
+    },
+  ];
 }
 
 /** 要件で指定された定型文そのまま。URLのみsettingsで差し替え可能 */

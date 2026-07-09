@@ -41,3 +41,10 @@ export type PollUrlInput = {
   /** 調整さんのイベントページURL。本文の末尾に付加される */
   url: string;
 };
+
+export type PollReminderInput = {
+  title: string;
+  /** 例: "21:00" */
+  deadlineTime: string;
+  url: string;
+};

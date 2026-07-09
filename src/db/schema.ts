@@ -154,6 +154,13 @@ export const schedulePolls = pgTable("schedule_polls", {
    */
   deadlineHandledAt: timestamp("deadline_handled_at", { withTimezone: true }),
   /**
+   * 締切当日のリマインドをメイングループに送信済みの印(冪等フラグ)。
+   * リマインド予定時刻(締切日17:00 JST)の算出はアプリ側(computeReminderAt)で行い、
+   * ここではdeadlineHandledAtと同じ「一度送ったら二度と送らない」の担保のみを持つ。
+   * 送信失敗時もセットしたままにし、自動リトライはしない(復旧は管理画面の手動送信)。
+   */
+  reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),
+  /**
    * 取込処理(importPollResults)がこの行をクレーム中である印。
    * 手動の「結果を取り込む」ボタンとcronの自動取込がほぼ同時に走ると、
    * 両方が同じ調整さんCSVから重複してイベントを作ってしまう(片方のイベントの

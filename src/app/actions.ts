@@ -30,6 +30,7 @@ import {
 import { jstToUtc, parseJstFromInput, toJstParts } from "@/lib/jst";
 import { pushMessages } from "@/lib/line/client";
 import { createEventWithSessions, importPollResults } from "@/lib/poll-import";
+import { sendPollReminderNow } from "@/lib/poll-reminder";
 import { resolveScheduledAt } from "@/lib/reschedule";
 import { requireMainGroup, sendScheduledMessage } from "@/lib/send";
 import { SETTING_KEYS, setSetting } from "@/lib/settings";
@@ -395,6 +396,21 @@ export async function postSchedulePollUrl(
     await postPollUrlToMainGroup(db, poll);
     revalidatePath("/polls");
     return { ok: true, message: "グループに投稿しました" };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/** 日程調整の締切当日リマインドの手動送信(自動送信がスキップ/失敗したケースの救済) */
+export async function sendPollReminder(
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const id = z.uuid().parse(text(formData, "id"));
+    const db = getDb();
+    await sendPollReminderNow(db, id);
+    revalidatePath("/polls");
+    return { ok: true, message: "リマインドを送信しました" };
   } catch (e) {
     return failure(e);
   }

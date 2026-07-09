@@ -9,6 +9,7 @@ import Link from "next/link";
 import {
   importSchedulePoll,
   postSchedulePollUrl,
+  sendPollReminder,
   startSchedulePoll,
 } from "@/app/actions";
 import { ConfirmButton } from "@/components/ConfirmButton";
@@ -93,6 +94,7 @@ export default async function PollsPage() {
         かんたん作成は来月の全日程、カスタム作成はカレンダーで選んだ日付と時刻が候補になります。
         回答が集まったら「結果を取り込む」で、◯=1点・△=0.5点の集計上位2日程のイベントが自動作成されます(候補の時刻がそのまま開催時刻に。同点は早い日付を優先)。
         回答の締切日時を過ぎると自動でこの取込が行われ、採用された2日程それぞれの◯・△の投票者がSlackに通知されます。
+        締切当日の17時ごろには「本日締切です」のリマインドをメイングループへ自動投稿します(投稿から締切までが24時間未満の場合は送りません)。
       </p>
 
       <Card>
@@ -262,7 +264,7 @@ export default async function PollsPage() {
                     )}
                   </CardAction>
                 </CardHeader>
-                <CardContent className="flex items-center gap-3 text-sm">
+                <CardContent className="flex flex-wrap items-center gap-3 text-sm">
                   <a
                     href={poll.chouseisanUrl}
                     target="_blank"
@@ -293,6 +295,32 @@ export default async function PollsPage() {
                       </ConfirmButton>
                     </ToastForm>
                   )}
+                  {poll.status === "open" &&
+                    poll.postedAt &&
+                    poll.deadlineAt &&
+                    !poll.deadlineHandledAt &&
+                    (poll.reminderSentAt ? (
+                      <span className="text-muted-foreground">
+                        リマインド送信済み{" "}
+                        {formatJstDateTimeLabel(poll.reminderSentAt)}
+                      </span>
+                    ) : (
+                      <ToastForm
+                        action={sendPollReminder}
+                        className="flex items-center gap-2"
+                      >
+                        <Badge variant="secondary">リマインド未送信</Badge>
+                        <input type="hidden" name="id" value={poll.id} />
+                        <ConfirmButton
+                          confirmMessage="締切リマインドをメイングループにLINE送信します。よろしいですか?(グループ人数分のメッセージ数を消費します)"
+                          actionLabel="送信する"
+                          size="xs"
+                        >
+                          <SendIcon data-icon="inline-start" />
+                          リマインドを送る
+                        </ConfirmButton>
+                      </ToastForm>
+                    ))}
                 </CardContent>
               </Card>
             </li>
