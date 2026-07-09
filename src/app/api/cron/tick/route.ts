@@ -1,12 +1,14 @@
 import { getDb } from "@/db/client";
 import { getEnv } from "@/lib/env";
+import { checkPollDeadlines } from "@/lib/poll-deadline";
 import { runTick } from "@/lib/tick";
 
 export const dynamic = "force-dynamic";
 
 /**
  * 外部cron(cron-job.org等)から5分間隔で叩かれるエンドポイント。
- * 期限到来した予約メッセージ(前日案内・当日案内・アンケート)を送信する。
+ * 期限到来した予約メッセージ(前日案内・当日案内・アンケート)の送信と、
+ * 締切超過した日程調整の自動取込(+Slack通知)を行う。
  * 定期的なDBアクセスがSupabase無料枠の自動一時停止の回避も兼ねる。
  */
 export async function GET(req: Request): Promise<Response> {
@@ -17,9 +19,11 @@ export async function GET(req: Request): Promise<Response> {
     return new Response("unauthorized", { status: 401 });
   }
 
-  const result = await runTick(getDb());
-  if (result.results.length > 0 || result.staleFailed > 0) {
-    console.log("cron tick", JSON.stringify(result));
+  const db = getDb();
+  const tick = await runTick(db);
+  const pollDeadlines = await checkPollDeadlines(db);
+  if (tick.results.length > 0 || tick.staleFailed > 0 || pollDeadlines.length > 0) {
+    console.log("cron tick", JSON.stringify({ tick, pollDeadlines }));
   }
-  return Response.json(result);
+  return Response.json({ tick, pollDeadlines });
 }

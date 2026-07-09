@@ -24,22 +24,12 @@ import {
 import {
   buildMonthCandidateDates,
   createChouseisanEvent,
-  fetchChouseisanCsv,
   nextMonthStart,
-  parseChouseisanCsv,
-  rankCandidates,
-  tallyChouseisanCsvByLabel,
   toPollCandidates,
 } from "@/lib/chouseisan";
-import {
-  dayBeforeAt15,
-  dayOfAt9,
-  defaultSurveyAt,
-  jstToUtc,
-  parseJstFromInput,
-  toJstParts,
-} from "@/lib/jst";
+import { jstToUtc, parseJstFromInput, toJstParts } from "@/lib/jst";
 import { pushMessages } from "@/lib/line/client";
+import { createEventWithSessions, importPollResults } from "@/lib/poll-import";
 import { resolveScheduledAt } from "@/lib/reschedule";
 import { requireMainGroup, sendScheduledMessage } from "@/lib/send";
 import { SETTING_KEYS, setSetting } from "@/lib/settings";
@@ -98,61 +88,6 @@ export async function createEvent(formData: FormData): Promise<ActionResult> {
   }
   // redirectは内部でthrowするため、failure()に飲み込まれないようtryの外に置く
   redirect(`/events/${eventId}`);
-}
-
-/**
- * イベント + 日程 + チェックリスト(=送信キュー)を一括作成する。
- * 「何を送るべきか」が最初から全部見えることが抜け漏れ防止の core なので、
- * 後から行を足す方式にはしない。フォームからの作成と日程調整の取込の共通処理。
- */
-async function createEventWithSessions(
-  db: Db,
-  title: string,
-  startAts: Date[],
-): Promise<{ id: string }> {
-  const [event] = await db.insert(events).values({ title }).returning();
-
-  const smValues: (typeof scheduledMessages.$inferInsert)[] = [];
-  for (const startAt of startAts) {
-    const [session] = await db
-      .insert(sessions)
-      .values({ eventId: event.id, startAt })
-      .returning();
-    smValues.push(
-      {
-        eventId: event.id,
-        sessionId: session.id,
-        kind: "group_invite",
-        scheduledAt: null,
-      },
-      {
-        eventId: event.id,
-        sessionId: session.id,
-        kind: "slide_request",
-        scheduledAt: null,
-      },
-      {
-        eventId: event.id,
-        sessionId: session.id,
-        kind: "day_before",
-        scheduledAt: dayBeforeAt15(startAt),
-      },
-      {
-        eventId: event.id,
-        sessionId: session.id,
-        kind: "day_of",
-        scheduledAt: dayOfAt9(startAt),
-      },
-      {
-        eventId: event.id,
-        sessionId: session.id,
-        kind: "survey",
-        scheduledAt: defaultSurveyAt(startAt),
-      },
-    );
-  }
-  await db.insert(scheduledMessages).values(smValues);
-  return event;
 }
 
 export async function updateSession(
@@ -316,12 +251,6 @@ export async function setGroupKind(formData: FormData): Promise<ActionResult> {
   }
 }
 
-/**
- * candidates未保存の既存行の取込で使う開催時刻
- * (現在の作成フローは候補ごとに開始時刻を持つため、ここは使わない)
- */
-const DEFAULT_SESSION_HOUR = 19;
-
 /** "HH:MM" を [hour, minute] に分解する(zodでhalfHourTime検証済みの値を渡す) */
 function splitTime(time: string): [number, number] {
   const [hour, minute] = time.split(":").map(Number);
@@ -337,7 +266,19 @@ function splitTime(time: string): [number, number] {
 async function createPollAndPost(
   message: string,
   candidateDates: Date[],
+  deadlineAt: Date,
 ): Promise<ActionResult> {
+  if (deadlineAt.getTime() <= Date.now()) {
+    return { ok: false, message: "締切日時は未来の日時にしてください" };
+  }
+  const earliestCandidate = Math.min(...candidateDates.map((d) => d.getTime()));
+  if (deadlineAt.getTime() >= earliestCandidate) {
+    return {
+      ok: false,
+      message: "締切は最も早い候補日より前にしてください",
+    };
+  }
+
   const db = getDb();
   const candidates = toPollCandidates(candidateDates);
   const first = toJstParts(new Date(candidates[0].startAt));
@@ -353,7 +294,14 @@ async function createPollAndPost(
 
   const [poll] = await db
     .insert(schedulePolls)
-    .values({ title, chouseisanUrl: url, targetMonth, message, candidates })
+    .values({
+      title,
+      chouseisanUrl: url,
+      targetMonth,
+      message,
+      candidates,
+      deadlineAt,
+    })
     .returning();
 
   // URL投稿に失敗しても調整さんイベント自体は作成済みなので、行は残して
@@ -384,12 +332,14 @@ export async function startSchedulePoll(
     const input = startSchedulePollSchema.parse({
       message: text(formData, "message"),
       time: text(formData, "time"),
+      deadline: text(formData, "deadline"),
     });
 
     const [hour, minute] = splitTime(input.time);
     return await createPollAndPost(
       input.message,
       buildMonthCandidateDates(nextMonthStart(new Date()), hour, minute),
+      parseJstFromInput(input.deadline),
     );
   } catch (e) {
     return failure(e);
@@ -406,12 +356,14 @@ export async function startCustomSchedulePoll(
   try {
     const input = startCustomSchedulePollSchema.parse({
       message: text(formData, "message"),
+      deadline: text(formData, "deadline"),
       candidates: parseJsonOrEmptyArray(text(formData, "candidates")),
     });
 
     return await createPollAndPost(
       input.message,
       input.candidates.map((c) => parseJstFromInput(`${c.date}T${c.time}`)),
+      parseJstFromInput(input.deadline),
     );
   } catch (e) {
     return failure(e);
@@ -485,52 +437,29 @@ export async function importSchedulePoll(
       .where(eq(schedulePolls.id, id));
     if (!poll) return { ok: false, message: "日程調整が見つかりません" };
 
-    if (poll.status === "imported" && poll.importedEventId) {
-      eventId = poll.importedEventId;
-    } else {
-      const csv = await fetchChouseisanCsv(poll.chouseisanUrl);
-      // candidates保存済みの行はラベル完全一致で照合し、開始時刻も候補が持つ。
-      // 未保存の既存行は旧ロジック(対象月のM/D復元 + 既定時刻)で取り込む
-      const ranked = rankCandidates(
-        poll.candidates
-          ? tallyChouseisanCsvByLabel(csv, poll.candidates)
-          : parseChouseisanCsv(csv, poll.targetMonth),
-      );
-      if (ranked.length === 0) {
+    const outcome = await importPollResults(db, poll);
+    switch (outcome.kind) {
+      case "no_candidates":
         return {
           ok: false,
           message:
             "集計できる候補が見つかりません(調整さんのページ構成が変わった可能性があります)",
         };
-      }
-      if (ranked[0].score <= 0) {
+      case "no_votes":
         return {
           ok: false,
           message:
             "まだ回答がありません(全候補0点)。回答が集まってから取り込んでください",
         };
-      }
-
-      const startAts = ranked
-        .slice(0, 2)
-        .map((c) => {
-          if (poll.candidates) return c.date;
-          const p = toJstParts(c.date);
-          return jstToUtc(p.year, p.month, p.day, DEFAULT_SESSION_HOUR, 0);
-        })
-        .sort((a, b) => a.getTime() - b.getTime());
-
-      const month = toJstParts(poll.targetMonth).month;
-      const event = await createEventWithSessions(
-        db,
-        `${month}月交流会`,
-        startAts,
-      );
-      await db
-        .update(schedulePolls)
-        .set({ status: "imported", importedEventId: event.id })
-        .where(eq(schedulePolls.id, poll.id));
-      eventId = event.id;
+      case "in_progress":
+        return {
+          ok: false,
+          message:
+            "ちょうど自動取込の処理中です。しばらくしてから再度お試しください",
+        };
+      case "already_imported":
+      case "imported":
+        eventId = outcome.eventId;
     }
   } catch (e) {
     return failure(e);

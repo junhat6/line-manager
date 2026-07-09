@@ -145,6 +145,22 @@ export const schedulePolls = pgTable("schedule_polls", {
    */
   candidates: jsonb("candidates").$type<PollCandidate[]>(),
   status: pollStatusEnum("status").notNull().default("open"),
+  /** 回答の締切日時。cronがこれを過ぎたopenな行を検知して自動取込する(nullは締切未設定=自動取込の対象外) */
+  deadlineAt: timestamp("deadline_at", { withTimezone: true }),
+  /**
+   * cronが締切超過を処理済みの印。statusとは独立して持つ — 0票で締切を迎えた場合は
+   * イベントを作らずstatusをopenのまま(手動の「結果を取り込む」を使えるように)残したいが、
+   * 同じ行を次回のtickで再処理しないためのフラグが別途必要なため
+   */
+  deadlineHandledAt: timestamp("deadline_handled_at", { withTimezone: true }),
+  /**
+   * 取込処理(importPollResults)がこの行をクレーム中である印。
+   * 手動の「結果を取り込む」ボタンとcronの自動取込がほぼ同時に走ると、
+   * 両方が同じ調整さんCSVから重複してイベントを作ってしまう(片方のイベントの
+   * 予約メッセージが孤立したまま実際に送信される)ため、両者が共通で経由する
+   * importPollResults の入口でここをクレームして片方を弾く
+   */
+  importingAt: timestamp("importing_at", { withTimezone: true }),
   /** URLをメイングループに投稿した時刻(nullなら未投稿=投稿失敗の可能性) */
   postedAt: timestamp("posted_at", { withTimezone: true }),
   /** 取込で作成されたイベント。イベント削除時はnullに戻る(調整の履歴は残す) */

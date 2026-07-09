@@ -1,0 +1,1 @@
+ALTER TABLE "schedule_polls" ADD COLUMN "importing_at" timestamp with time zone;

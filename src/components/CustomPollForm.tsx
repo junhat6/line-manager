@@ -13,6 +13,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -31,6 +32,8 @@ import {
 type Props = {
   /** メッセージ欄のプリフィル(既定文面はサーバ側の知識なのでpropsで受ける) */
   defaultMessage: string;
+  /** 締切欄のプリフィル("datetime-local"形式。候補選択に応じた動的再計算はしない) */
+  defaultDeadline: string;
   /** カレンダーの初期表示月(来月)。Dateはシリアライズ境界を避けて数値で受ける */
   initialYear: number;
   /** 1-12 */
@@ -92,6 +95,7 @@ function TimeSelect({
  */
 export function CustomPollForm({
   defaultMessage,
+  defaultDeadline,
   initialYear,
   initialMonth,
 }: Props) {
@@ -166,6 +170,19 @@ export function CustomPollForm({
             </ul>
           </Field>
         )}
+        <Field>
+          <FieldLabel htmlFor="custom-poll-deadline">回答の締切日時</FieldLabel>
+          <Input
+            id="custom-poll-deadline"
+            type="datetime-local"
+            name="deadline"
+            required
+            defaultValue={defaultDeadline}
+          />
+          <FieldDescription className="text-xs">
+            締切を過ぎると自動で結果を取り込み(上位2日程でイベント作成)、Slackに通知します
+          </FieldDescription>
+        </Field>
         <Field>
           <FieldLabel htmlFor="custom-poll-message">
             グループに投稿するメッセージ

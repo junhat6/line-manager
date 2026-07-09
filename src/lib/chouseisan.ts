@@ -72,26 +72,42 @@ export type CandidateResult = {
   absent: number; // ×
   /** ○=1点 + △=0.5点 (×と未入力は0点) */
   score: number;
+  /** 誰が◯/△/×を付けたか(名前)。Slack通知で「誰を招待すべきか」を示すのに使う */
+  voters: { attend: string[]; maybe: string[]; absent: string[] };
 };
 
-/** 候補行の2列目以降(参加者ごとの回答)を集計する */
-function countMarks(row: string[]): {
+/**
+ * 候補行の2列目以降(参加者ごとの回答)を集計する。
+ * namesは名前ヘッダー行の2列目以降(列位置で回答と対応)。取得できない/欠けている場合は
+ * 「N人目」にフォールバックする(名前ヘッダーが無い変則的なCSVでも集計自体は壊さないため)。
+ */
+function countMarks(
+  row: string[],
+  names: string[],
+): {
   attend: number;
   maybe: number;
   absent: number;
   score: number;
+  voters: { attend: string[]; maybe: string[]; absent: string[] };
 } {
-  let attend = 0;
-  let maybe = 0;
-  let absent = 0;
-  for (const cell of row.slice(1)) {
+  const voters = { attend: [] as string[], maybe: [] as string[], absent: [] as string[] };
+  const voterNames = names.slice(1);
+  row.slice(1).forEach((cell, i) => {
     const mark = cell.trim();
-    if (mark === "○" || mark === "◯") attend++;
-    else if (mark === "△") maybe++;
-    else if (mark === "×" || mark === "✕") absent++;
+    const name = (voterNames[i] ?? "").trim() || `${i + 1}人目`;
+    if (mark === "○" || mark === "◯") voters.attend.push(name);
+    else if (mark === "△") voters.maybe.push(name);
+    else if (mark === "×" || mark === "✕") voters.absent.push(name);
     // 未入力・その他は集計対象外
-  }
-  return { attend, maybe, absent, score: attend + maybe * 0.5 };
+  });
+  return {
+    attend: voters.attend.length,
+    maybe: voters.maybe.length,
+    absent: voters.absent.length,
+    score: voters.attend.length + voters.maybe.length * 0.5,
+    voters,
+  };
 }
 
 /**
@@ -105,16 +121,22 @@ export function tallyChouseisanCsvByLabel(
 ): CandidateResult[] {
   const remaining = new Map(candidates.map((c) => [c.label, c]));
   const results: CandidateResult[] = [];
+  const rows = parseCsvRows(csvText);
+  // 名前ヘッダー行は固定位置(3行目)に頼らず「最初に候補行としてマッチした行の直前行」とする。
+  // 候補行の判定自体が位置非依存(ラベル完全一致)なので、この方が一貫性がある
+  let names: string[] = [];
 
-  for (const row of parseCsvRows(csvText)) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
     const label = (row[0] ?? "").trim();
     const candidate = remaining.get(label);
     if (!candidate) continue;
     remaining.delete(label);
+    if (results.length === 0) names = rows[i - 1] ?? [];
     results.push({
       label,
       date: new Date(candidate.startAt),
-      ...countMarks(row),
+      ...countMarks(row, names),
     });
   }
   return results;
@@ -133,8 +155,11 @@ export function parseChouseisanCsv(
 ): CandidateResult[] {
   const target = toJstParts(targetMonth);
   const results: CandidateResult[] = [];
+  const rows = parseCsvRows(csvText);
+  let names: string[] = [];
 
-  for (const row of parseCsvRows(csvText)) {
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
     const label = (row[0] ?? "").trim();
     const m = /^(\d{1,2})\/(\d{1,2})/.exec(label);
     if (!m) continue;
@@ -142,10 +167,11 @@ export function parseChouseisanCsv(
     const day = Number(m[2]);
     if (month !== target.month) continue;
 
+    if (results.length === 0) names = rows[i - 1] ?? [];
     results.push({
       label,
       date: jstToUtc(target.year, month, day),
-      ...countMarks(row),
+      ...countMarks(row, names),
     });
   }
   return results;

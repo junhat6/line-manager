@@ -62,15 +62,24 @@ const halfHourTime = z
     "時刻は30分刻み(例 20:00、20:30)で指定してください",
   );
 
+/**
+ * 締切日時("datetime-local"の生文字列)。形式チェックのみここで行い、
+ * Date変換とビジネスルール検証(未来日時・候補日より前か)はactions.ts側で行う
+ * (候補日が確定してからでないと「候補日より前か」を判定できないため)
+ */
+const deadlineInput = z.string().min(1, "締切日時を入力してください");
+
 /** かんたん作成: 来月の全日程を候補にする。時刻は全候補共通 */
 export const startSchedulePollSchema = z.object({
   message: pollMessage,
   time: halfHourTime,
+  deadline: deadlineInput,
 });
 
 /** カスタム作成: カレンダーで選んだ日付ごとに開始時刻を持つ */
 export const startCustomSchedulePollSchema = z.object({
   message: pollMessage,
+  deadline: deadlineInput,
   candidates: z
     .array(
       z.object({

@@ -37,6 +37,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -49,7 +50,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { getDb } from "@/db/client";
 import { schedulePolls } from "@/db/schema";
 import { nextMonthStart } from "@/lib/chouseisan";
-import { formatJstDateTimeLabel, toJstParts } from "@/lib/jst";
+import {
+  formatJstDateTimeLabel,
+  formatJstForInput,
+  jstToUtc,
+  toJstParts,
+} from "@/lib/jst";
 import {
   DEFAULT_POLL_TIME,
   HALF_HOUR_TIME_ITEMS,
@@ -57,6 +63,14 @@ import {
 import { defaultPollMessageBody } from "@/lib/templates";
 
 export const dynamic = "force-dynamic";
+
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** 締切入力欄の既定値: 候補開始日の7日前 21:00 JST(運営はそのまま/自由に変更できる) */
+function defaultDeadlineInput(candidateStart: Date): string {
+  const p = toJstParts(new Date(candidateStart.getTime() - WEEK_MS));
+  return formatJstForInput(jstToUtc(p.year, p.month, p.day, 21, 0));
+}
 
 export default async function PollsPage() {
   const db = getDb();
@@ -66,8 +80,10 @@ export default async function PollsPage() {
     .orderBy(desc(schedulePolls.createdAt));
 
   // フォームのプリフィル用。dynamic="force-dynamic" なのでリクエスト時点の来月が入る
-  const nextMonthParts = toJstParts(nextMonthStart(new Date()));
+  const nextMonthStartDate = nextMonthStart(new Date());
+  const nextMonthParts = toJstParts(nextMonthStartDate);
   const nextMonth = nextMonthParts.month;
+  const defaultDeadline = defaultDeadlineInput(nextMonthStartDate);
 
   return (
     <div className="flex flex-col gap-6">
@@ -76,6 +92,7 @@ export default async function PollsPage() {
         調整さん(chouseisan.com)に日時候補の出欠表を作り、URLをメイングループへ自動投稿します。
         かんたん作成は来月の全日程、カスタム作成はカレンダーで選んだ日付と時刻が候補になります。
         回答が集まったら「結果を取り込む」で、◯=1点・△=0.5点の集計上位2日程のイベントが自動作成されます(候補の時刻がそのまま開催時刻に。同点は早い日付を優先)。
+        回答の締切日時を過ぎると自動でこの取込が行われ、採用された2日程それぞれの◯・△の投票者がSlackに通知されます。
       </p>
 
       <Card>
@@ -110,6 +127,19 @@ export default async function PollsPage() {
                 </Select>
                 <FieldDescription className="text-xs">
                   候補は「8/1(土) 20:00」のように日付+この時刻で作られ、取込後の開催時刻になります
+                </FieldDescription>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="poll-deadline">回答の締切日時</FieldLabel>
+                <Input
+                  id="poll-deadline"
+                  type="datetime-local"
+                  name="deadline"
+                  required
+                  defaultValue={defaultDeadline}
+                />
+                <FieldDescription className="text-xs">
+                  締切を過ぎると自動で結果を取り込み(上位2日程でイベント作成)、Slackに通知します
                 </FieldDescription>
               </Field>
               <Field>
@@ -153,6 +183,7 @@ export default async function PollsPage() {
         <CardContent>
           <CustomPollForm
             defaultMessage={defaultPollMessageBody(nextMonth)}
+            defaultDeadline={defaultDeadline}
             initialYear={nextMonthParts.year}
             initialMonth={nextMonth}
           />
@@ -181,7 +212,10 @@ export default async function PollsPage() {
                   <CardDescription>
                     作成: {formatJstDateTimeLabel(poll.createdAt)} / 対象:{" "}
                     {toJstParts(poll.targetMonth).year}年
-                    {toJstParts(poll.targetMonth).month}月
+                    {toJstParts(poll.targetMonth).month}月 / 締切:{" "}
+                    {poll.deadlineAt
+                      ? formatJstDateTimeLabel(poll.deadlineAt)
+                      : "未設定"}
                   </CardDescription>
                   <CardAction>
                     {poll.status === "imported" ? (

@@ -105,6 +105,15 @@ describe("parseChouseisanCsv", () => {
     expect(results).toHaveLength(1);
     expect(results[0].label).toBe("8/1(土)");
   });
+
+  it("名前ヘッダー行(候補行の直前行)と列位置を突き合わせて誰が投票したか返す", () => {
+    const results = parseChouseisanCsv(SAMPLE_CSV, targetMonth);
+    expect(results[0].voters).toEqual({
+      attend: ["山田"],
+      maybe: ["佐藤"],
+      absent: ["田中"],
+    });
+  });
 });
 
 describe("tallyChouseisanCsvByLabel", () => {
@@ -155,6 +164,28 @@ describe("tallyChouseisanCsvByLabel", () => {
     );
     expect(results).toHaveLength(1);
     expect(results[0].attend).toBe(1);
+  });
+
+  it("名前ヘッダー行と列位置を突き合わせて誰が投票したか返す", () => {
+    const results = tallyChouseisanCsvByLabel(csv, candidates);
+    expect(results[0].voters).toEqual({
+      attend: ["山田"],
+      maybe: ["佐藤"],
+      absent: ["田中"],
+    });
+  });
+
+  it("名前ヘッダー行が無い(先頭行が候補行)場合は「N人目」にフォールバックする", () => {
+    const noHeader = ["8/1(土) 20:00,○,×"].join("\n");
+    const results = tallyChouseisanCsvByLabel(
+      noHeader,
+      toPollCandidates([jstToUtc(2026, 8, 1, 20, 0)]),
+    );
+    expect(results[0].voters).toEqual({
+      attend: ["1人目"],
+      maybe: [],
+      absent: ["2人目"],
+    });
   });
 });
 
