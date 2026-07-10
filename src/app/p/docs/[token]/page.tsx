@@ -4,6 +4,7 @@ import path from "node:path";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Markdown } from "@/components/markdown";
+import { ManualSections } from "@/components/manual-sections";
 import {
   Card,
   CardContent,
@@ -12,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { getAppBaseUrl } from "@/lib/env";
+import { splitManualSections } from "@/lib/manual";
 
 /**
  * 運営マニュアルの限定公開ページ。
@@ -64,6 +66,7 @@ export default async function ManualPage({
   if (!expected || !safeEqual(token, expected)) notFound();
 
   const manual = await readManual();
+  const { intro, sections } = splitManualSections(manual);
   const adminUser = process.env.ADMIN_USER;
   const adminPassword = process.env.ADMIN_PASSWORD;
   let adminUrl: string | null;
@@ -109,7 +112,11 @@ export default async function ManualPage({
         </CardContent>
       </Card>
 
-      <Markdown>{manual}</Markdown>
+      <Markdown>{intro}</Markdown>
+
+      <div className="mt-8">
+        <ManualSections sections={sections} />
+      </div>
     </main>
   );
 }
