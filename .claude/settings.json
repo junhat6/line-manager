@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"${f##*/}\" in .env.example) ;; .env|.env.*|package-lock.json) echo \"ブロック: ${f##*/} は直接編集禁止です。.env の変更は手動で、依存関係の変更は npm コマンド経由で行ってください。\" >&2; exit 2;; esac"
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"${f##*/}\" in .env.example) ;; .env|.env.*|package-lock.json) echo \"ブロック: ${f##*/} は直接編集禁止です。.env の変更は手動で、依存関係の変更は npm コマンド経由で行ってください。\" >&2; exit 2;; esac; case \"$f\" in drizzle/*|*/drizzle/*) echo \"ブロック: drizzle/ 配下は drizzle-kit generate による自動生成物です。スキーマは src/db/schema.ts を編集し、npm run db:generate (または /create-migration) で再生成してください。\" >&2; exit 2;; esac"
           }
         ]
       }
@@ -17,9 +17,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *.ts|*.tsx) cd \"$CLAUDE_PROJECT_DIR\" || exit 0; out=$(npm run typecheck 2>&1) || { echo \"$out\" >&2; exit 2; }; out=$(npm run lint 2>&1) || { echo \"$out\" >&2; exit 2; };; esac",
-            "timeout": 180,
-            "statusMessage": "typecheck + lint 実行中…"
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *.ts|*.tsx) cd \"$CLAUDE_PROJECT_DIR\" || exit 0; out=$(npm run typecheck 2>&1) || { echo \"$out\" >&2; exit 2; }; out=$(npm run lint 2>&1) || { echo \"$out\" >&2; exit 2; }; case \"$f\" in */src/lib/*.test.ts) out=$(npx vitest run \"$f\" 2>&1) || { echo \"$out\" >&2; exit 2; } ;; */src/lib/*.ts) t=\"${f%.ts}.test.ts\"; if [ -f \"$t\" ]; then out=$(npx vitest run \"$t\" 2>&1) || { echo \"$out\" >&2; exit 2; }; fi ;; esac ;; esac",
+            "timeout": 240,
+            "statusMessage": "typecheck + lint (+関連テスト) 実行中…"
           }
         ]
       }

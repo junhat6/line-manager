@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# mise local overrides (secrets; see mise.toml)
+mise.local.toml
+
 # vercel
 .vercel
 
