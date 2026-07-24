@@ -42,7 +42,7 @@ export const events = pgTable("events", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 /** 開催日程。日程別LINEグループ・スライドURLなどはここに紐づく */
 export const sessions = pgTable("sessions", {
@@ -61,7 +61,7 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 /** ボットが参加しているLINEグループ。joinイベントで自動登録 */
 export const lineGroups = pgTable("line_groups", {
@@ -79,7 +79,7 @@ export const lineGroups = pgTable("line_groups", {
   joinedAt: timestamp("joined_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 /**
  * グループメンバーの記録。memberJoined webhookで表示名を控えておく。
@@ -104,7 +104,7 @@ export const lineGroupMembers = pgTable(
     leftAt: timestamp("left_at", { withTimezone: true }),
   },
   (t) => [unique().on(t.lineGroupId, t.lineUserId)],
-);
+).enableRLS();
 
 /**
  * 送信キュー兼チェックリストの実体。
@@ -128,7 +128,7 @@ export const scheduledMessages = pgTable("scheduled_messages", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 export const pollStatusEnum = pgEnum("poll_status", ["open", "imported"]);
 
@@ -203,13 +203,13 @@ export const schedulePolls = pgTable("schedule_polls", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}).enableRLS();
 
 /** key-value設定(メイングループID、アンケートURLなど) */
 export const settings = pgTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
-});
+}).enableRLS();
 
 export type Event = typeof events.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
