@@ -5,6 +5,7 @@ import { settings } from "@/db/schema";
 export const SETTING_KEYS = {
   surveyUrlFirst: "survey_url_first",
   surveyUrlRepeat: "survey_url_repeat",
+  leaveSurveyUrl: "leave_survey_url",
 } as const;
 
 type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
@@ -19,6 +20,8 @@ export const SETTING_DEFAULTS: Record<SettingKey, string> = {
     "https://docs.google.com/forms/d/1uG--hgYSz0N4cExd-BR-nG8sc4B_HpfjXpxWykDoskI/viewform",
   survey_url_repeat:
     "https://docs.google.com/forms/d/1_gcDRUXR2NihNjgGcdsK1Bl_33FyhTmi2lmuxSNguUE/viewform",
+  // 空 = 未設定。退会者へのキャンセル理由DMを送らず、Slack通知のみになる
+  leave_survey_url: "",
 };
 
 export async function getSetting(db: Db, key: SettingKey): Promise<string> {

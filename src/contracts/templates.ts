@@ -42,6 +42,13 @@ export type PollUrlInput = {
   url: string;
 };
 
+export type LeaveSurveyInput = {
+  /** 例: "7/22(火)" */
+  dateLabel: string;
+  /** キャンセル理由を聞くGoogleフォームのURL */
+  formUrl: string;
+};
+
 export type PollReminderInput = {
   title: string;
   /** 例: "21:00" */

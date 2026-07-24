@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import {
   createEventSchema,
+  saveLeaveSurveySettingSchema,
   saveSettingsSchema,
   startCustomSchedulePollSchema,
   startSchedulePollSchema,
@@ -494,6 +495,23 @@ export async function saveSettings(formData: FormData): Promise<ActionResult> {
     const db = getDb();
     await setSetting(db, SETTING_KEYS.surveyUrlFirst, input.surveyUrlFirst);
     await setSetting(db, SETTING_KEYS.surveyUrlRepeat, input.surveyUrlRepeat);
+
+    revalidatePath("/settings");
+    return { ok: true, message: "保存しました" };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+export async function saveLeaveSurveySetting(
+  formData: FormData,
+): Promise<ActionResult> {
+  try {
+    const input = saveLeaveSurveySettingSchema.parse({
+      leaveSurveyUrl: text(formData, "leaveSurveyUrl").trim(),
+    });
+
+    await setSetting(getDb(), SETTING_KEYS.leaveSurveyUrl, input.leaveSurveyUrl);
 
     revalidatePath("/settings");
     return { ok: true, message: "保存しました" };

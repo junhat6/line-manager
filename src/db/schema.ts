@@ -6,6 +6,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -79,6 +80,31 @@ export const lineGroups = pgTable("line_groups", {
     .notNull()
     .defaultNow(),
 });
+
+/**
+ * グループメンバーの記録。memberJoined webhookで表示名を控えておく。
+ * 退会(memberLeft)イベントにはuserIdしか載らず、退会後はプロフィール取得APIも
+ * 使えないため、退会通知に人間が読める名前を出すには参加時点の記録が唯一の手段。
+ * この機能の導入前から参加しているメンバーは記録がない(通常ボットは既存メンバーの
+ * 一覧取得APIを使えない)ので、displayNameが引けない退会はuserIdのまま通知する。
+ */
+export const lineGroupMembers = pgTable(
+  "line_group_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** LINEのグループID(lineGroups.lineGroupIdと同じ値空間。FKにしないのはグループ再招待でも記録を残すため) */
+    lineGroupId: text("line_group_id").notNull(),
+    lineUserId: text("line_user_id").notNull(),
+    /** 参加時にプロフィール取得できなかった場合はnull */
+    displayName: text("display_name"),
+    joinedAt: timestamp("joined_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    /** 退会を検知した時刻。同じ人が再参加したらnullに戻す */
+    leftAt: timestamp("left_at", { withTimezone: true }),
+  },
+  (t) => [unique().on(t.lineGroupId, t.lineUserId)],
+);
 
 /**
  * 送信キュー兼チェックリストの実体。
@@ -188,5 +214,6 @@ export const settings = pgTable("settings", {
 export type Event = typeof events.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type LineGroup = typeof lineGroups.$inferSelect;
+export type LineGroupMember = typeof lineGroupMembers.$inferSelect;
 export type ScheduledMessage = typeof scheduledMessages.$inferSelect;
 export type SchedulePoll = typeof schedulePolls.$inferSelect;

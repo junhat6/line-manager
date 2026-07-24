@@ -71,6 +71,13 @@
       "when": 1783564535601,
       "tag": "0009_skinny_starhawk",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784818394562,
+      "tag": "0010_sour_talon",
+      "breakpoints": true
     }
   ]
 }

@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { CheckIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
-import { saveSettings } from "@/app/actions";
+import { saveLeaveSurveySetting, saveSettings } from "@/app/actions";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ToastForm } from "@/components/ToastForm";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -25,15 +25,17 @@ export default async function SettingsPage() {
   const db = getDb();
   // 互いに依存しない読み取りは並列化してTTFBを縮める
   // (LINE APIを呼ぶgetChannelQuotasが特に遅く、直列だと合算で待つことになる)
-  const [surveyUrlFirst, surveyUrlRepeat, mainRows, quotas] = await Promise.all([
-    getSetting(db, SETTING_KEYS.surveyUrlFirst),
-    getSetting(db, SETTING_KEYS.surveyUrlRepeat),
-    db
-      .select()
-      .from(lineGroups)
-      .where(and(eq(lineGroups.kind, "main"), eq(lineGroups.active, true))),
-    getChannelQuotas(),
-  ]);
+  const [surveyUrlFirst, surveyUrlRepeat, leaveSurveyUrl, mainRows, quotas] =
+    await Promise.all([
+      getSetting(db, SETTING_KEYS.surveyUrlFirst),
+      getSetting(db, SETTING_KEYS.surveyUrlRepeat),
+      getSetting(db, SETTING_KEYS.leaveSurveyUrl),
+      db
+        .select()
+        .from(lineGroups)
+        .where(and(eq(lineGroups.kind, "main"), eq(lineGroups.active, true))),
+      getChannelQuotas(),
+    ]);
   const mainGroup = mainRows[0];
 
   return (
@@ -142,6 +144,35 @@ export default async function SettingsPage() {
                 />
               </Field>
               {/* Fieldの中に置くと *:w-full で全幅に伸ばされるためFieldGroup直下に置く */}
+              <SubmitButton className="w-fit">保存する</SubmitButton>
+            </FieldGroup>
+          </ToastForm>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>キャンセル理由フォームURL</CardTitle>
+          <CardDescription>
+            開催前に日程別グループを退会した人へ、理由を聞くDMに載せるGoogleフォームです。
+            未設定の間はDMを送らず、Slack通知のみになります。
+            (DMはボットを友だち追加している人にのみ届き、送れなかった場合はSlackに通知されます)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ToastForm action={saveLeaveSurveySetting}>
+            <FieldGroup className="gap-4">
+              <Field>
+                <FieldLabel htmlFor="leaveSurveyUrl">フォームURL</FieldLabel>
+                <Input
+                  id="leaveSurveyUrl"
+                  type="url"
+                  name="leaveSurveyUrl"
+                  spellCheck={false}
+                  placeholder="https://…"
+                  defaultValue={leaveSurveyUrl}
+                />
+              </Field>
               <SubmitButton className="w-fit">保存する</SubmitButton>
             </FieldGroup>
           </ToastForm>

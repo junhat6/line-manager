@@ -4,6 +4,7 @@ import {
   buildDayBeforeMessages,
   buildDayOfMessages,
   buildGroupInviteMessages,
+  buildLeaveSurveyMessages,
   buildPollUrlMessages,
   buildSlideRequestMessages,
   buildSurveyMessages,
@@ -80,6 +81,18 @@ describe("テキストテンプレート", () => {
       }),
     );
     expect(text).not.toContain("当日の流れ");
+  });
+
+  it("キャンセル理由ヒアリングは日程とフォームURLを含み、責める文面にしない", () => {
+    const text = textOf(
+      buildLeaveSurveyMessages({
+        dateLabel: "7/22(水)",
+        formUrl: "https://docs.google.com/forms/d/leave/viewform",
+      }),
+    );
+    expect(text).toContain("7/22(水)");
+    expect(text).toContain("https://docs.google.com/forms/d/leave/viewform");
+    expect(text).toContain("よろしければ");
   });
 
   it("アンケートは要件の定型文の形式でURL2種を含む", () => {

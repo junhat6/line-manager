@@ -3,6 +3,7 @@ import type {
   DayBeforeInput,
   DayOfInput,
   GroupInviteInput,
+  LeaveSurveyInput,
   PollReminderInput,
   PollUrlInput,
   SlideRequestInput,
@@ -105,6 +106,25 @@ export function buildPollReminderMessages(input: PollReminderInput): Message[] {
         `⏰【${input.title}】の回答締切は本日${input.deadlineTime}までです!`,
         "まだの方はお早めにお願いします🙏",
         input.url,
+      ].join("\n"),
+    },
+  ];
+}
+
+/**
+ * 日程別グループを開催前に退会した人へのキャンセル理由ヒアリングDM。
+ * 責める印象を与えないよう「参考にしたい」の一言を添える(回答率にも効く)。
+ */
+export function buildLeaveSurveyMessages(input: LeaveSurveyInput): Message[] {
+  return [
+    {
+      type: "text",
+      text: [
+        `【${input.dateLabel}】の交流会グループからの退会を確認しました。`,
+        "",
+        "今後の運営の参考にしたいので、",
+        "よろしければキャンセルの理由を教えてください🙏",
+        input.formUrl,
       ].join("\n"),
     },
   ];

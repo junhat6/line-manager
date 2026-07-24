@@ -100,3 +100,20 @@ export const saveSettingsSchema = z.object({
   surveyUrlFirst: z.url({ error: "1回目用アンケートのURLが不正です" }),
   surveyUrlRepeat: z.url({ error: "2回目以降用アンケートのURLが不正です" }),
 });
+
+export const saveLeaveSurveySettingSchema = z.object({
+  // 空文字は「未設定」(退会者へのDMを送らずSlack通知のみ)として許可する。
+  // このURLは退会者へのDM本文にそのまま載るため、httpsに限定し、
+  // 空白・改行を弾く(WHATWG URLパーサは改行を除去して解釈するため、
+  // z.urlだけでは改行入り文字列が「有効」と判定され原文のまま保存されてしまう)
+  leaveSurveyUrl: z.literal("").or(
+    z
+      .url({
+        protocol: /^https$/,
+        error: "キャンセル理由フォームのURLが不正です(https必須)",
+      })
+      .refine((v) => !/\s/.test(v), {
+        error: "URLに空白や改行は使えません",
+      }),
+  ),
+});
