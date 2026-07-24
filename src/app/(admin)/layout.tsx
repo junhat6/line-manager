@@ -21,16 +21,22 @@ export default function AdminLayout({
         本文へスキップ
       </a>
       <header className="border-b bg-background">
-        <div className="mx-auto flex max-w-5xl items-center gap-6 px-6 py-3">
+        <div className="mx-auto grid max-w-5xl grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 sm:flex sm:gap-6 sm:px-6">
           <Link
             href="/"
-            className="rounded-md text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="w-fit whitespace-nowrap rounded-md text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             交流会運営支援
           </Link>
-          <AdminNav />
+          <div className="col-span-2 row-start-2 min-w-0 sm:col-auto sm:row-auto">
+            <AdminNav />
+          </div>
           {/* JS不要のプレーンなform。遷移先でcookieが失効するので画面更新の考慮も不要 */}
-          <form method="post" action="/api/auth/logout" className="ml-auto">
+          <form
+            method="post"
+            action="/api/auth/logout"
+            className="col-start-2 row-start-1 sm:ml-auto"
+          >
             <Button
               type="submit"
               variant="ghost"

@@ -133,7 +133,7 @@ export function CustomPollForm({
             />
           </div>
           <FieldDescription className="text-xs">
-            クリックで候補日を選びます(月をまたいで選べます)
+            クリックで候補日を選びます。月をまたいでも選べます
           </FieldDescription>
         </Field>
         <Field>
@@ -176,11 +176,12 @@ export function CustomPollForm({
             id="custom-poll-deadline"
             type="datetime-local"
             name="deadline"
+            autoComplete="off"
             required
             defaultValue={defaultDeadline}
           />
           <FieldDescription className="text-xs">
-            締切を過ぎると自動で結果を取り込み(上位2日程でイベント作成)、Slackに通知します
+            締切当日にLINEでリマインドし、締切後に結果を自動で取り込みます
           </FieldDescription>
         </Field>
         <Field>
@@ -190,12 +191,13 @@ export function CustomPollForm({
           <Textarea
             id="custom-poll-message"
             name="message"
+            autoComplete="off"
             rows={3}
             required
             defaultValue={defaultMessage}
           />
           <FieldDescription className="text-xs">
-            末尾に調整さんのURLが自動で付きます
+            調整さんのURLは末尾に自動で付きます
           </FieldDescription>
         </Field>
         {sorted.length === 0 ? (
@@ -211,8 +213,8 @@ export function CustomPollForm({
             size="default"
             className="w-fit"
           >
-            <PlusIcon data-icon="inline-start" />
-            カスタム日程調整を開始
+            <PlusIcon data-icon="inline-start" aria-hidden="true" />
+            {sorted.length}件の候補で作成
           </ConfirmButton>
         )}
       </FieldGroup>

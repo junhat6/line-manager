@@ -16,7 +16,10 @@ export function AdminNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex items-center gap-1">
+    <nav
+      aria-label="管理メニュー"
+      className="flex min-w-0 items-center gap-1 overflow-x-auto"
+    >
       {NAV_ITEMS.map((item) => {
         const active =
           item.href === "/"
@@ -28,7 +31,7 @@ export function AdminNav() {
             href={item.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "rounded-md px-3 py-1.5 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              "shrink-0 rounded-md px-3 py-1.5 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
               active
                 ? "bg-muted font-medium text-foreground"
                 : "text-muted-foreground hover:text-foreground",
